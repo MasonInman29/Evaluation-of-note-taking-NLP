@@ -1,0 +1,7 @@
+pandas
+python-dotenv
+tqdm
+transformers>=4.40
+accelerate
+sentencepiece
+torch
