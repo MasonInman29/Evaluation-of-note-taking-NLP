@@ -9,9 +9,10 @@ SEGMENT_COLS = {
 }
 
 def load_data(data_dir="data"):
-    
-    # Load Notes.csv, train.csv, and test.csv from LLM-Model/data/
-    
+    """
+    Load Notes.csv, train.csv, and test.csv from the given directory.
+    Example directory: LLM/data/
+    """
     notes = pd.read_csv(f"{data_dir}/Notes.csv")
     train = pd.read_csv(f"{data_dir}/train.csv")
     test = pd.read_csv(f"{data_dir}/test.csv")
@@ -21,15 +22,16 @@ def load_data(data_dir="data"):
 
 
 def add_segment_text(df, notes_df):
-    
-    # Add a new column named 'segment_text' to the train or test DataFrame
-    # by getting the correct note segment from Notes.csv based on
-    # Experiment, Topic, ID, and Segment columns.
+    """
+    Add a new column named 'segment_text' to the train or test DataFrame
+    by getting the correct note segment from Notes.csv based on
+    Topic, ID, and Segment columns.
+    """
 
     # Merge based on matching metadata
     merged = df.merge(
         notes_df,
-        on=["Experiment", "Topic", "ID"],
+        on=["Topic", "ID"],
         how="left",
         suffixes=("", "_note")  # avoid duplicate column names
     )
