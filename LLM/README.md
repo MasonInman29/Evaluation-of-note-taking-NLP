@@ -228,11 +228,11 @@ python src/evaluate_llm.py   --pred_path outputs/llama3_train_one_shot.csv
 
 Outputs:
 
--   Accuracy\
--   Precision\
--   Recall\
--   F1\
--   Confusion matrix\
+-   Accuracy
+-   Precision
+-   Recall
+-   F1
+-   Confusion matrix
 -   Full classification report
 
 ------------------------------------------------------------------------
@@ -246,7 +246,7 @@ Outputs:
 -   Error patterns:
     -   paraphrasing
     -   notes using synonyms
-    -   overly literal false negatives\
+    -   overly literal false negatives
 -   Effectiveness of one-shot example selection
 
 ------------------------------------------------------------------------
@@ -255,7 +255,8 @@ Outputs:
 
 This LLM pipeline:
 
--   Is fully reproducible\
--   Works with LLaMA\
--   Runs on CPU/GPU/Nova\
--   Provides interpretable YES/NO outputs\
+-   Is fully reproducible
+-   Works with LLaMA
+-   Runs on CPU/GPU/Nova
+-   Provides interpretable YES/NO outputs
+-   Evaluation of results
