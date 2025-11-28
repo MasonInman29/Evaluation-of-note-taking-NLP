@@ -166,8 +166,8 @@ Defines two prompting styles:
 
 ### Zero-shot
 
-Model sees: - Instructions\
-- IdeaUnit\
+Model sees: - Instructions
+- IdeaUnit
 - Student note
 
 ### One-shot
@@ -188,10 +188,10 @@ Main pipeline:
 
 Computes:
 
--   Accuracy\
--   Precision\
--   Recall\
--   F1-score\
+-   Accuracy
+-   Precision
+-   Recall
+-   F1-score
 -   Confusion matrix
 
 ------------------------------------------------------------------------
