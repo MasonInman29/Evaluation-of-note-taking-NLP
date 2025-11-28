@@ -237,15 +237,12 @@ Outputs:
 
 ------------------------------------------------------------------------
 
-# What to Report
-
-For the LLM section of the final report:
+# The LLM section of the final report includes:
 
 -   Model used: LLaMA 3 8B Instruct
 -   Prompting methods: 0-shot, 1-shot
 -   Accuracy on train/dev
 -   Precision/Recall/F1
--   Analysis vs. BERT + rule-based
 -   Error patterns:
     -   paraphrasing
     -   notes using synonyms
@@ -259,13 +256,6 @@ For the LLM section of the final report:
 This LLM pipeline:
 
 -   Is fully reproducible\
--   Works with both FLAN and LLaMA\
+-   Works with LLaMA\
 -   Runs on CPU/GPU/Nova\
 -   Provides interpretable YES/NO outputs\
--   Integrates cleanly into the overall project
-
-For any improvements, you can:
-
--   Add batch inference\
--   Try LLaMA 3 70B on HPC\
--   Fine-tune FLAN on the small dataset
