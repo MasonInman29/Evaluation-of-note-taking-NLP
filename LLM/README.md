@@ -218,7 +218,7 @@ python src/llm_note_classifier.py   --data_dir data   --split test   --mode one_
 
 ------------------------------------------------------------------------
 
-# 🧪 Evaluation Script
+# Evaluation Script
 
 Example:
 
