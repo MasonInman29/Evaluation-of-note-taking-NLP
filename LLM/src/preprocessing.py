@@ -8,6 +8,7 @@ SEGMENT_COLS = {
     4: "Segment4_Notes",
 }
 
+
 def load_data(data_dir: str = "data"):
     """
     Load Notes.csv, train.csv, and test.csv from the given directory.
@@ -27,13 +28,17 @@ def add_segment_text(df: pd.DataFrame, notes_df: pd.DataFrame) -> pd.DataFrame:
     """
     Add a new column named 'segment_text' to the train or test DataFrame
     by getting the correct note segment from Notes.csv based on
-    Topic, ID, and Segment columns.
+    shared keys (Topic, ID, optionally Experiment) and Segment.
     """
 
-    # Merge based on matching metadata
+    # Decide merge keys based on what both dataframes actually have
+    merge_keys = ["Topic", "ID"]
+    if "Experiment" in df.columns and "Experiment" in notes_df.columns:
+        merge_keys.insert(0, "Experiment")
+
     merged = df.merge(
         notes_df,
-        on=["Topic", "ID"],
+        on=merge_keys,
         how="left",
         suffixes=("", "_note"),  # avoid duplicate column names
     )

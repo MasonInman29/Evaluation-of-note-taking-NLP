@@ -194,7 +194,7 @@ def run_llm_classifier(
     out_df.to_csv(output_path, index=False)
     print(f"Saved predictions to {output_path}")
 
-    # If labels exist (train split), print a quick accuracy
+    # If labels exist (train or test split with labels), print a quick accuracy
     if "label" in out_df.columns:
         acc = (out_df["pred_llm"] == out_df["label"]).mean()
         print(f"Accuracy on {split} split: {acc:.4f}")
