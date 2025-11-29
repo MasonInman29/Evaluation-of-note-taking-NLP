@@ -33,9 +33,9 @@ def add_segment_text(df: pd.DataFrame, notes_df: pd.DataFrame) -> pd.DataFrame:
     # Merge based on matching metadata
     merged = df.merge(
         notes_df,
-        on=["Topic", "ID"],
+        on=["Experiment", "Topic", "ID"],
         how="left",
-        suffixes=("", "_note"),  # avoid duplicate column names
+        suffixes=("", "_note"),
     )
 
     # Get the correct segment column
