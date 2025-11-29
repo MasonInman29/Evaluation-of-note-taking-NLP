@@ -8,10 +8,9 @@ SEGMENT_COLS = {
     4: "Segment4_Notes",
 }
 
-def load_data(data_dir="data"):
+def load_data(data_dir: str = "data"):
     """
     Load Notes.csv, train.csv, and test.csv from the given directory.
-    Example directory: LLM/data/
 
     Uses a lenient encoding to avoid UnicodeDecodeError caused by
     smart quotes or other non-UTF-8 characters.
@@ -24,7 +23,7 @@ def load_data(data_dir="data"):
     return notes, train, test
 
 
-def add_segment_text(df, notes_df):
+def add_segment_text(df: pd.DataFrame, notes_df: pd.DataFrame) -> pd.DataFrame:
     """
     Add a new column named 'segment_text' to the train or test DataFrame
     by getting the correct note segment from Notes.csv based on
@@ -36,7 +35,7 @@ def add_segment_text(df, notes_df):
         notes_df,
         on=["Topic", "ID"],
         how="left",
-        suffixes=("", "_note")  # avoid duplicate column names
+        suffixes=("", "_note"),  # avoid duplicate column names
     )
 
     # Get the correct segment column
@@ -46,7 +45,7 @@ def add_segment_text(df, notes_df):
         # Return segment_text only if segment number is valid,
         # the segment column exists, and the value is not null
         if col and col in row and pd.notnull(row[col]):
-            return row[col]
+            return str(row[col])
         return ""
 
     merged["segment_text"] = merged.apply(_get_segment, axis=1)

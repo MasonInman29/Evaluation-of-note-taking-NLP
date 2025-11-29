@@ -260,3 +260,5 @@ This LLM pipeline:
 -   Runs on CPU/GPU/Nova
 -   Provides interpretable YES/NO outputs
 -   Evaluation of results
+
+- First model version always predicted 0
