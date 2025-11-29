@@ -12,10 +12,13 @@ def load_data(data_dir="data"):
     """
     Load Notes.csv, train.csv, and test.csv from the given directory.
     Example directory: LLM/data/
+
+    Uses a lenient encoding to avoid UnicodeDecodeError caused by
+    smart quotes or other non-UTF-8 characters.
     """
-    notes = pd.read_csv(f"{data_dir}/Notes.csv")
-    train = pd.read_csv(f"{data_dir}/train.csv")
-    test = pd.read_csv(f"{data_dir}/test.csv")
+    notes = pd.read_csv(f"{data_dir}/Notes.csv", encoding="latin1")
+    train = pd.read_csv(f"{data_dir}/train.csv", encoding="latin1")
+    test = pd.read_csv(f"{data_dir}/test.csv", encoding="latin1")
 
     print("Data loaded successfully!")
     return notes, train, test
