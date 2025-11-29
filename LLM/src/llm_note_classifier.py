@@ -1,6 +1,5 @@
 import argparse
 import os
-import re
 
 import pandas as pd
 from tqdm import tqdm
@@ -13,7 +12,7 @@ from preprocessing import load_data, add_segment_text
 from prompts import build_prompt_zero_shot, build_prompt_one_shot
 
 
-# Load HF token from .env
+# ---------- Load HF token from .env ----------
 
 load_dotenv()  # looks for .env in project root (LLM/.env)
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -22,7 +21,7 @@ if HF_TOKEN is None:
     raise RuntimeError("HF_TOKEN is not set. Create a .env file with HF_TOKEN=...")
 
 
-# Load LLaMA 3 model
+# ---------- Load LLaMA 3 model ----------
 
 MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
 
@@ -45,7 +44,7 @@ model.eval()
 print(f"LLaMA 3 loaded. Using device: {device}")
 
 
-# Helper functions
+# ---------- Helper functions ----------
 
 def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
     """
@@ -55,21 +54,19 @@ def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
     - Group by Topic
     - Prefer a positive (label=1) example with non-empty segment_text
     - Fallback to the first non-empty note in the group
+
     Returns a dict: { topic: example_row }.
     """
     examples = {}
     for topic, group in train_df.groupby("Topic"):
-        # Ensure segment_text is a string and non-empty
         group = group.copy()
         group["segment_text"] = group["segment_text"].fillna("").astype(str)
         non_empty = group[group["segment_text"].str.strip() != ""]
 
         if len(non_empty) == 0:
-            # If somehow all are empty, just use the first row
             examples[topic] = group.iloc[0]
             continue
 
-        # Prefer positive examples
         pos = non_empty[non_empty["label"] == 1]
         if len(pos) > 0:
             examples[topic] = pos.iloc[0]
@@ -79,14 +76,22 @@ def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
     return examples
 
 
-def call_llm(prompt: str, max_new_tokens: int = 8) -> int:
+def call_llm(prompt: str) -> int:
     """
-    Send a prompt to LLaMA 3 and map YES/NO to 1/0.
+    Classify with LLaMA 3 by comparing the logits for ' YES' vs ' NO'
+    as the next token after the prompt.
 
     Returns:
         1 for YES,
-        0 for NO (or on failure / unexpected output).
+        0 for NO.
     """
+    # Token IDs for the candidate answers
+    yes_ids = tokenizer(" YES", add_special_tokens=False)["input_ids"]
+    no_ids = tokenizer(" NO", add_special_tokens=False)["input_ids"]
+
+    yes_id = yes_ids[0]
+    no_id = no_ids[0]
+
     with torch.no_grad():
         inputs = tokenizer(
             prompt,
@@ -95,40 +100,15 @@ def call_llm(prompt: str, max_new_tokens: int = 8) -> int:
             max_length=512,
         ).to(model.device)
 
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            temperature=0.0,
-            pad_token_id=tokenizer.eos_token_id,
-        )
+        outputs = model(**inputs)
+        # logits for the next token (last position)
+        logits_last = outputs.logits[0, -1]  # shape: [vocab_size]
 
-    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    upper = text.upper()
+    yes_logit = logits_last[yes_id].item()
+    no_logit = logits_last[no_id].item()
 
-    # Focus on what comes after "ANSWER:"
-    if "ANSWER:" in upper:
-        after = upper.split("ANSWER:", 1)[1]
-    else:
-        after = upper
-
-    # Look for YES or NO as standalone words in the answer section
-    m = re.search(r"\b(YES|NO)\b", after)
-    if m:
-        ans = m.group(1)
-        if ans == "YES":
-            return 1
-        if ans == "NO":
-            return 0
-
-    # Weak fallback: search in the whole output
-    if "YES" in upper and "NO" not in upper:
-        return 1
-    if "NO" in upper and "YES" not in upper:
-        return 0
-
-    print(f"[WARNING!] Unexpected model output: {repr(text)} -> defaulting to 0")
-    return 0
+    # Higher logit = higher probability
+    return 1 if yes_logit > no_logit else 0
 
 
 def run_llm_classifier(
@@ -205,8 +185,12 @@ def run_llm_classifier(
         cols_to_keep.append("label")  # available for train/test if present
 
     out_df = df[cols_to_keep]
+
     # Ensure output directory exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    parent_dir = os.path.dirname(output_path)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
     out_df.to_csv(output_path, index=False)
     print(f"Saved predictions to {output_path}")
 
