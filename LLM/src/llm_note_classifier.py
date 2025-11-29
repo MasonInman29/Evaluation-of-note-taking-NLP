@@ -46,34 +46,95 @@ print(f"LLaMA 3 loaded. Using device: {device}")
 
 # ---------- Helper functions ----------
 
+def lexical_overlap_score(idea: str, note: str) -> float:
+    """
+    Simple lexical overlap between IdeaUnit and note.
+    Score = (# of idea tokens that appear in note) / (# of idea tokens).
+    """
+    idea_tokens = (
+        idea.lower()
+        .replace(".", " ")
+        .replace(",", " ")
+        .replace(";", " ")
+        .split()
+    )
+    note_tokens = (
+        note.lower()
+        .replace(".", " ")
+        .replace(",", " ")
+        .replace(";", " ")
+        .split()
+    )
+
+    idea_tokens = {t for t in idea_tokens if t}
+    note_tokens = {t for t in note_tokens if t}
+
+    if not idea_tokens:
+        return 0.0
+
+    return len(idea_tokens & note_tokens) / len(idea_tokens)
+
+
 def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
     """
     Select one example row per Topic from the training data.
 
-    Strategy:
-    - Group by Topic
-    - Prefer a positive (label=1) example with non-empty segment_text
-    - Fallback to the first non-empty note in the group
+    Improved strategy:
+    - Group by Topic.
+    - For each Topic:
+        * Filter to rows with non-empty segment_text.
+        * Prefer positive examples (label == 1).
+        * Among positives, choose the one with the highest lexical overlap
+          between IdeaUnit and segment_text.
+        * If no positives exist for that Topic, fall back to the non-empty
+          example with highest overlap.
 
-    Returns a dict: { topic: example_row }.
+    This automatically finds "cleanest" examples like:
+        - Physics:   "the smallest quantity of energy is quantum ..."
+        - Statistics:"retrospective go back in time data already collected"
+        - Ecology:   "feather eyes around ..."
+        - CompSci:   CU / control unit description
+
+    Returns:
+        dict: { topic: example_row }
     """
     examples = {}
+
+    # Ensure text columns are strings
+    train_df = train_df.copy()
+    train_df["segment_text"] = train_df["segment_text"].fillna("").astype(str)
+    train_df["IdeaUnit"] = train_df["IdeaUnit"].astype(str)
+
     for topic, group in train_df.groupby("Topic"):
         group = group.copy()
-        group["segment_text"] = group["segment_text"].fillna("").astype(str)
-        non_empty = group[group["segment_text"].str.strip() != ""]
 
+        # Only consider rows with actual note text
+        non_empty = group[group["segment_text"].str.strip() != ""]
         if len(non_empty) == 0:
+            # Fallback: no usable text, just pick the first row
             examples[topic] = group.iloc[0]
             continue
 
-        pos = non_empty[non_empty["label"] == 1]
-        if len(pos) > 0:
-            examples[topic] = pos.iloc[0]
-        else:
-            examples[topic] = non_empty.iloc[0]
+        # First try positives
+        pos = non_empty[non_empty["label"] == 1].copy()
+        target_df = pos if len(pos) > 0 else non_empty.copy()
+
+        # Compute lexical overlap for each candidate
+        target_df["overlap"] = target_df.apply(
+            lambda r: lexical_overlap_score(str(r["IdeaUnit"]), str(r["segment_text"])),
+            axis=1,
+        )
+
+        # Pick the single best example (highest overlap)
+        best_row = target_df.sort_values("overlap", ascending=False).iloc[0]
+        examples[topic] = best_row
 
     return examples
+
+
+# Precompute token IDs for " YES" and " NO" once (not every call)
+YES_TOKEN_ID = tokenizer(" YES", add_special_tokens=False)["input_ids"][0]
+NO_TOKEN_ID = tokenizer(" NO", add_special_tokens=False)["input_ids"][0]
 
 
 def call_llm(prompt: str) -> int:
@@ -85,13 +146,6 @@ def call_llm(prompt: str) -> int:
         1 for YES,
         0 for NO.
     """
-    # Token IDs for the candidate answers
-    yes_ids = tokenizer(" YES", add_special_tokens=False)["input_ids"]
-    no_ids = tokenizer(" NO", add_special_tokens=False)["input_ids"]
-
-    yes_id = yes_ids[0]
-    no_id = no_ids[0]
-
     with torch.no_grad():
         inputs = tokenizer(
             prompt,
@@ -104,8 +158,8 @@ def call_llm(prompt: str) -> int:
         # logits for the next token (last position)
         logits_last = outputs.logits[0, -1]  # shape: [vocab_size]
 
-    yes_logit = logits_last[yes_id].item()
-    no_logit = logits_last[no_id].item()
+    yes_logit = logits_last[YES_TOKEN_ID].item()
+    no_logit = logits_last[NO_TOKEN_ID].item()
 
     # Higher logit = higher probability
     return 1 if yes_logit > no_logit else 0

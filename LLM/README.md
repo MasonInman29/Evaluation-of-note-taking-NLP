@@ -196,9 +196,11 @@ Computes:
 
 ------------------------------------------------------------------------
 
-# Running the Model (Local or Nova)
+# Running the Model
 
-## 1. Run on train set (validation)
+## 1. Run on train set
+
+To run zero shot model just replace the model type with: zero_shot and output_path with: llama3_train_zero_shot.csv
 
 ``` bash
 python src/llm_note_classifier.py   --data_dir data   --split train   --mode one_shot   --output_path outputs/llama3_train_one_shot.csv
@@ -220,10 +222,16 @@ python src/llm_note_classifier.py   --data_dir data   --split test   --mode one_
 
 # Evaluation Script
 
-Example:
+Example for train set:
 
 ``` bash
 python src/evaluate_llm.py   --pred_path outputs/llama3_train_one_shot.csv
+```
+
+Example for test set:
+
+``` bash
+python src/evaluate_llm.py   --pred_path outputs/llama3_test_one_shot.csv
 ```
 
 Outputs:
