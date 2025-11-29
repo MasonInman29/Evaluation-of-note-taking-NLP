@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 
 import pandas as pd
 from tqdm import tqdm
@@ -13,6 +14,7 @@ from prompts import build_prompt_zero_shot, build_prompt_one_shot
 
 
 # Load HF token from .env
+
 load_dotenv()  # looks for .env in project root (LLM/.env)
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -21,21 +23,22 @@ if HF_TOKEN is None:
 
 
 # Load LLaMA 3 model
+
 MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
 
 print(f"Loading LLaMA 3 model: {MODEL_NAME}")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_auth_token=HF_TOKEN)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, token=HF_TOKEN)
 
 # half-precision on GPU, full precision on CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
-# For big models, is better to let HF handle device placement so (device_map="auto")
+# Let HF handle device placement
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
-    torch_dtype=dtype,
-    device_map="auto",          # works well on Nova GPUs
-    use_auth_token=HF_TOKEN,
+    dtype=dtype,
+    device_map="auto",
+    token=HF_TOKEN,
 )
 
 model.eval()
@@ -47,20 +50,39 @@ print(f"LLaMA 3 loaded. Using device: {device}")
 def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
     """
     Select one example row per Topic from the training data.
-    Assumes train_df already has 'segment_text'.
+
+    Strategy:
+    - Group by Topic
+    - Prefer a positive (label=1) example with non-empty segment_text
+    - Fallback to the first non-empty note in the group
     Returns a dict: { topic: example_row }.
     """
     examples = {}
-    for _, row in train_df.iterrows():
-        topic = row["Topic"]
-        if topic not in examples:
-            examples[topic] = row
+    for topic, group in train_df.groupby("Topic"):
+        # Ensure segment_text is a string and non-empty
+        group = group.copy()
+        group["segment_text"] = group["segment_text"].fillna("").astype(str)
+        non_empty = group[group["segment_text"].str.strip() != ""]
+
+        if len(non_empty) == 0:
+            # If somehow all are empty, just use the first row
+            examples[topic] = group.iloc[0]
+            continue
+
+        # Prefer positive examples
+        pos = non_empty[non_empty["label"] == 1]
+        if len(pos) > 0:
+            examples[topic] = pos.iloc[0]
+        else:
+            examples[topic] = non_empty.iloc[0]
+
     return examples
 
 
-def call_llm(prompt: str, max_new_tokens: int = 16) -> int:
+def call_llm(prompt: str, max_new_tokens: int = 8) -> int:
     """
     Send a prompt to LLaMA 3 and map YES/NO to 1/0.
+
     Returns:
         1 for YES,
         0 for NO (or on failure / unexpected output).
@@ -78,18 +100,34 @@ def call_llm(prompt: str, max_new_tokens: int = 16) -> int:
             max_new_tokens=max_new_tokens,
             do_sample=False,
             temperature=0.0,
+            pad_token_id=tokenizer.eos_token_id,
         )
 
-        text = tokenizer.decode(outputs[0], skip_special_tokens=True).strip().upper()
+    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    upper = text.upper()
 
-    first_token = text.split()[0] if text else ""
+    # Focus on what comes after "ANSWER:"
+    if "ANSWER:" in upper:
+        after = upper.split("ANSWER:", 1)[1]
+    else:
+        after = upper
 
-    if "YES" in first_token:
+    # Look for YES or NO as standalone words in the answer section
+    m = re.search(r"\b(YES|NO)\b", after)
+    if m:
+        ans = m.group(1)
+        if ans == "YES":
+            return 1
+        if ans == "NO":
+            return 0
+
+    # Weak fallback: search in the whole output
+    if "YES" in upper and "NO" not in upper:
         return 1
-    if "NO" in first_token:
+    if "NO" in upper and "YES" not in upper:
         return 0
 
-    print(f"[WARNING!] Unexpected model output: '{text}' -> defaulting to 0")
+    print(f"[WARNING!] Unexpected model output: {repr(text)} -> defaulting to 0")
     return 0
 
 
@@ -135,15 +173,15 @@ def run_llm_classifier(
     print(f"Running LLaMA 3 classifier on {split} split with mode={mode}, n={n} rows")
 
     for _, row in tqdm(df.iterrows(), total=n):
-        idea = row["IdeaUnit"]
-        note = row["segment_text"]
+        idea = str(row["IdeaUnit"])
+        note = str(row["segment_text"])
         topic = row["Topic"]
 
         if mode == "one_shot":
             ex = examples_by_topic[topic]
-            ex_idea = ex["IdeaUnit"]
-            ex_note = ex["segment_text"]
-            ex_label = ex["label"]
+            ex_idea = str(ex["IdeaUnit"])
+            ex_note = str(ex["segment_text"])
+            ex_label = int(ex["label"])
 
             prompt = build_prompt_one_shot(
                 idea=idea,
@@ -167,6 +205,8 @@ def run_llm_classifier(
         cols_to_keep.append("label")  # available for train/test if present
 
     out_df = df[cols_to_keep]
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     out_df.to_csv(output_path, index=False)
     print(f"Saved predictions to {output_path}")
 
