@@ -12,16 +12,16 @@ from preprocessing import load_data, add_segment_text
 from prompts import build_prompt_zero_shot, build_prompt_one_shot
 
 
-# ---------- Load HF token from .env ----------
+# Load HF token from .env
 
-load_dotenv()  # looks for .env in project root (LLM/.env)
+load_dotenv() 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 if HF_TOKEN is None:
     raise RuntimeError("HF_TOKEN is not set. Create a .env file with HF_TOKEN=...")
 
 
-# ---------- Load LLaMA 3 model ----------
+# Load LLaMA 3 model
 
 MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
 
@@ -44,7 +44,7 @@ model.eval()
 print(f"LLaMA 3 loaded. Using device: {device}")
 
 
-# ---------- Helper functions ----------
+# Helper functions 
 
 def lexical_overlap_score(idea: str, note: str) -> float:
     """
