@@ -1,0 +1,183 @@
+\documentclass[11pt]{article}
+\usepackage{acl}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{natbib}
+\usepackage{tabularx}
+
+\title{COM S 5790 Final Project: Evaluating Note-Taking Quality Using Rule-Based, BERT, and LLM Models}
+
+\author{
+  First Author \qquad Second Author \qquad Jesus Soto Gonzalez\\[0.5em]
+  Department of Computer Science \\
+  Iowa State University \\[0.5em]
+  \texttt{first@iastate.edu, second@iastate.edu, jhsoto@iastate.edu}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This project studies how well different NLP methods can identify whether students capture important ideas while taking notes in 
+several subjects. We use lecturer specified ideas and student-written notes to frame this as a binary classification task. 
+Our work compares three approaches: a simple rule-based method, a BERT classifier trained on the available annotations, and a 
+large language model evaluated with zero-shot and one-shot prompting.
+\end{abstract}
+
+
+\section{Introduction}
+Note-taking is an important part of learning, but students vary in how well they record the main ideas from a lecture. Being able 
+to automatically check whether a note contains a specific key idea could help instructors understand what students are picking up 
+and could support research on study habits.
+
+In this project, we work with a dataset where each lecture has a set of important ideas, called IdeaUnits, and each student provides 
+notes divided into segments. The goal is to determine if a given IdeaUnit appears in the matching note segment. Because there is 
+only one labeled example per topic, the task becomes a low-resource classification problem with noisy text written by students.
+
+To explore different ways of handling this challenge, we evaluate three types of models: a rule-based approach, a BERT classifier 
+trained on the available labels, and a large language model that relies on prompting. Our goal is to 
+understand the strengths and weaknesses of each approach in this limited-supervision setting.
+
+
+\section{Related Work}
+
+\section{Methodology}
+All methods in this project address the same prediction task: given an IdeaUnit defined by the lecturer and the corresponding 
+segment of a student's notes, the model must decide whether the idea is present. Each team member implemented a different type 
+of model to study how various NLP approaches handle this low-resource setting. Below we describe each model in detail.
+
+\subsection{Rule-Based Model}
+
+\subsection{BERT-Based Classifier}
+
+\subsection{LLM-Based Model}
+For the large language model approach, we used Meta's LLaMA 3 8B Instruct model \citep{llama3}. The implementation is organized 
+into four main components: \texttt{preprocessing.py}, \texttt{prompts.py}, \texttt{llm\_note\_classifier.py}, and 
+\texttt{evaluate\_llm.py}. Together, these scripts form a simple pipeline that goes from raw CSV files to final predictions 
+and evaluation.
+
+\paragraph{Preprocessing (\texttt{preprocessing.py}).}
+This file loads \texttt{Notes.csv}, \texttt{train.csv}, and \texttt{test.csv} and aligns them into a usable format. The key step is 
+the \texttt{add\_segment\_text} function, which merges each (Topic, ID, Segment) pair with the corresponding note segment 
+like \texttt{Segment1\_Notes} and stores it in a single \texttt{segment\_text} field. This gives the LLM a direct pairing of an 
+IdeaUnit and the matching student note segment.
+
+\paragraph{Prompt construction (\texttt{prompts.py}).}
+This module defines two prompt templates, one for zero-shot and one for one-shot inference, following the in-context learning setup introduced in prior work \citep{brown2020language}. The zero-shot template includes only the task instructions, the IdeaUnit, and the student's note. The one-shot template adds a labeled example from the same topic, which contains an IdeaUnit, a note, and its correct label, so the model can see a simple demonstration of the task before answering.
+
+\paragraph{Model Execution (\texttt{llm\_note\_classifier.py}).}
+This script loads LLaMA 3 8B Instruct through the Hugging Face \texttt{transformers} library and runs the actual classification. 
+For each (IdeaUnit, \texttt{segment\_text}) pair, it builds a prompt using the functions in \texttt{prompts.py} and feeds it to the 
+model. The \texttt{call\_llm} function then compares the logits for the next token being ``YES'' or ``NO'' and selects the 
+label with the higher score as the prediction.
+
+For the one-shot condition, we use \texttt{select\_one\_shot\_examples} to choose a single example per topic. This function computes 
+a simple lexical overlap score between each IdeaUnit and its note and selects the positive example with the highest overlap. Using 
+token-level lexical similarity in this way \citep{manning2008foundations} helps us choose cleaner and more representative examples 
+for the prompts.
+
+\paragraph{In-depth LLM Evaluation (\texttt{evaluate\_llm.py}).}
+Finally, \texttt{evaluate\_llm.py} loads the saved predictions, compares them to the correct labels, and reports accuracy, 
+precision, recall, F1 score, and a full classification report using \texttt{scikit-learn}. These metrics are used in the Results 
+and Discussion section to compare zero-shot, one-shot, and the improved one-shot setups.
+
+
+\section{Experiments}
+
+\subsection{Rule-Based Model}
+
+\subsection{BERT-Based Classifier}
+
+\subsection{LLM-Based Model}
+For the LLM experiments, we evaluated the model on both the small labeled training split and the full labeled test split to 
+understand how it behaves on different amounts of data.
+
+Early tests used free-form generation, where the model was asked to produce “YES’’ or “NO’’ directly. This approach did not 
+work well. The model often generated full sentences such as “the note does not cover this idea,” and the parser mapped these 
+outputs to “NO.” Because of this, the model predicted only the negative class and never produced a single positive prediction, 
+so the initial results were not meaningful.
+
+To address this problem, we switched to a probability-based decision method. Instead of generating text, we ran the full prompt 
+through the model and checked which of the two tokens, “YES’’ or “NO,’’ the model considered more likely to appear next. We 
+selected the label with the higher probability. This approach follows common practices in prompt-based classification 
+\citep{brown2020language}, and it removed parsing issues, made the output deterministic, and allowed the model to correctly 
+predict both classes.
+
+In the one-shot setup, we first used the default example provided for each topic. After that, we tested an improved example 
+selection method. For each topic, we calculated a simple lexical overlap score between the IdeaUnit and the student’s note and 
+selected the positive example with the highest overlap. Using token-level lexical similarity in this way follows standard 
+heuristics in text matching \citep{manning2008foundations} and helped choose examples that were clearer and more directly 
+related to the idea being tested.
+
+\section{Results and Discussion}
+
+\subsection{Rule-Based Model}
+
+\subsection{BERT-Based Classifier}
+
+\subsection{LLM-Based Model}
+After replacing free-form generation with next-token logit scoring, the LLM began predicting both positive and negative labels 
+correctly, which made the evaluation meaningful.
+
+On the small training split, zero-shot prompting reached 59.6\% accuracy, slightly higher than the original one-shot setup at 
+58.8\%. Zero-shot also showed higher precision, while one-shot showed higher recall. Because the one-shot example came from a 
+single student's notes, it sometimes added noise rather than helping the model on this small dataset.
+
+On the full test split, zero-shot reached 63.9\% accuracy, and one-shot improved this to 64.7\%. Even though the gain was small, 
+it showed that providing one example helped the model generalize better across a much larger and more varied set of notes.
+
+The best performance came from the improved one-shot method that selected the positive example with the highest lexical overlap 
+between the IdeaUnit and the student note. This pushed test accuracy to 67.1\% and boosted precision, suggesting that clearer 
+and more relevant demonstrations make the prompt more effective.
+
+Overall, the LLM performed well above the simple baseline which reaches about 51\% accuracy with zero recall. These results show 
+that the model was able to capture meaningful connections between IdeaUnits and student-written 
+notes, and that prompt design played an important role in its performance.
+
+A summary of all LLM results is provided in Appendix Table~\ref{tab:llm_results}.
+
+\section{Conclusion}
+
+
+\section{Limitations}
+
+
+\appendix
+\section*{Appendix}
+
+\section{LLM Results}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\linewidth}{l c c c c}
+\hline
+\textbf{Model} & \textbf{Split} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} \\
+\hline
+Zero-shot & Train & 0.5961 & 0.6235 & 0.4274 \\
+Zero-shot & Test  & 0.6392 & 0.5905 & 0.5000 \\
+\hline
+One-shot  & Train & 0.5882 & 0.5785 & 0.5645 \\
+One-shot  & Test  & 0.6467 & 0.5101 & 0.5628 \\
+\hline
+One-shot (lex) & Train & 0.6235 & 0.6944 & 0.4032 \\
+One-shot (lex) & Test  & 0.6713 & 0.5462 & 0.5316 \\
+\hline
+\end{tabularx}
+\caption{LLM-based classification results for zero-shot, one-shot, and improved one-shot prompting setups.}
+\label{tab:llm_results}
+\end{table}
+
+
+\addcontentsline{toc}{section}{Appendix}
+
+\bibliography{custom}
+
+\end{document}
