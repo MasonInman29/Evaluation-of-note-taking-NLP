@@ -15,10 +15,10 @@
 \title{COM S 5790 Final Project: Evaluating Note-Taking Quality Using Rule-Based, BERT, and LLM Models}
 
 \author{
-  First Author \qquad Second Author \qquad Jesus Soto Gonzalez\\[0.5em]
+  Benjamin Jia Zhiang Kam \qquad Second Author \qquad Jesus Soto Gonzalez\\[0.5em]
   Department of Computer Science \\
   Iowa State University \\[0.5em]
-  \texttt{first@iastate.edu, second@iastate.edu, jhsoto@iastate.edu}
+  \texttt{bkam@iastate.edu, second@iastate.edu, jhsoto@iastate.edu}
 }
 
 \begin{document}
@@ -54,6 +54,13 @@ segment of a student's notes, the model must decide whether the idea is present.
 of model to study how various NLP approaches handle this low-resource setting. Below we describe each model in detail.
 
 \subsection{Rule-Based Model}
+For the rule based model approach, we decided to combine 5 metrics to evaluate the rule based prediction. These metrics are fuzzing matching, using RapidFuzz's token\_sort\_ratio, jaccard similarity, semantic similarity, using spaCy's embeddings, cosine similarity and numerical matching. The implementation of the model is split into three separate sections: \texttt{pre\_processing.ipynb}, \texttt{main.ipynb} and \texttt{threshold\_testing.ipynb}.\\
+
+\paragraph{Preprocessing (\texttt{pre\_processing.py}).}
+This file loads the selected CSV file and then applies a cleaning function on the 'Question', 'Response' and 'CorrectAnswer' columns. Here is a description of the features of the cleaning function: it handles missing values and Nans, preventing them from breaking the prediction, it converts every letter to lowercase and sends them into spaCy's nlp pipeline. Finally, it lemmatizes the words while filtering out punctuations and unnecessary spaces. Collectively, this allows our evaluation to be more accurate and precise.
+
+\paragraph{Threshold Testing (\texttt{threshold\_testing.py}).}
+This file
 
 \subsection{BERT-Based Classifier}
 
