@@ -15,10 +15,10 @@
 \title{COM S 5790 Final Project: Evaluating Note-Taking Quality Using Rule-Based, BERT, and LLM Models}
 
 \author{
-  First Author \qquad Second Author \qquad Jesus Soto Gonzalez\\[0.5em]
+  Benjamin Jia Zhiang Kam \qquad Second Author \qquad Jesus Soto Gonzalez\\[0.5em]
   Department of Computer Science \\
   Iowa State University \\[0.5em]
-  \texttt{first@iastate.edu, second@iastate.edu, jhsoto@iastate.edu}
+  \texttt{bkam@iastate.edu, second@iastate.edu, jhsoto@iastate.edu}
 }
 
 \begin{document}
@@ -54,6 +54,16 @@ segment of a student's notes, the model must decide whether the idea is present.
 of model to study how various NLP approaches handle this low-resource setting. Below we describe each model in detail.
 
 \subsection{Rule-Based Model}
+For the rule based model approach, we decided to combine 5 metrics to evaluate the rule based prediction. These metrics are fuzzing matching, using RapidFuzz's token\_sort\_ratio, jaccard similarity, semantic similarity, using spaCy's embeddings, cosine similarity and numerical matching. The implementation of the model is split into three separate sections: \texttt{pre\_processing.ipynb}, \texttt{main.ipynb} and \texttt{threshold\_testing.ipynb}.\\
+
+\paragraph{Preprocessing (\texttt{pre\_processing.ipynb}).}
+This file loads the selected CSV file, \texttt{train.csv} and \texttt{test.csv}, and applies a cleaning function on the 'Question', 'Response' and 'CorrectAnswer' columns. Here is a description of the features of the cleaning function: it handles missing values and Nans, preventing them from breaking the prediction, it converts every letter to lowercase and sends them into spaCy's nlp pipeline. Finally, it lemmatizes the words while filtering out punctuations and unnecessary spaces. Collectively, this allows our evaluation to be more accurate and precise. The results of pre-processing are saved into a separate CSV file.
+
+\paragraph{Threshold Testing (\texttt{threshold\_testing.ipynb}).}
+This file loads \texttt{train\_cleaned.csv} and for computational purposes, we only selected for testing the lower threshold for a label of 1 to be 0.60-0.65 and the lower threshold for a label of 0 to be 0.55 to whatever the current lower threshold for label of 1 is. The process of calculating the \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match} is carried out with a similar implementation as \texttt{main.ipynb}, which will be explained in detail in the following paragraph. The testing results are saved into a separate CSV file.
+
+\paragraph{Execution on Train dataset (\texttt{main.ipynb}).}
+This file uses the optimal thresholds provided by \texttt{threshold\_testing.ipynb} and applies them on \texttt{train\_cleaned.csv}. We calculate the \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match} and assign them weights to combine the metrics to give a weighted score. The predictions are saved in the 'Predicted Label' column of a separate CSV file.
 
 \subsection{BERT-Based Classifier}
 
@@ -93,6 +103,16 @@ and Discussion section to compare zero-shot, one-shot, and the improved one-shot
 
 \subsection{Rule-Based Model}
 
+For the rule based model, we began with 5 metrics for scoring - \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match}. This approach worked fairly well as the scoring mainly focuses on observing for overlapping words/tokens between Response and CorrectAnswer. As these are short answer questions, the scoring tends to be polarized easily, allowing a decisive prediction to be made. 
+
+For the second experiment, we decided to test the effects of removing \texttt{num\_match} as we realized that not all questions were numerical and due to \texttt{num\_match}'s weight, it would not be impactful. This led to improved results, which we believe was due to the increased weight on \texttt{fuzzy\_ratio}, which prioritized overlapping/similar words instead of meaning.
+
+We realized that spaCy's \texttt{semantic\_similarity} was based on a machine learning model, and this means that the previous rule based models were not true rule based models. As we want the final rule based model to be completely rule based, we conducted our third experiment, where scoring left out \texttt{semantic}. The results showed that our first 'true' rule based model was performing better than the hydrid model with \texttt{semantic} as accuracy, precision and recall improved. 
+
+Following the same intuition we had in experiment two, we conducted our fourth experiment without \texttt{semantic} and \texttt{num\_match}. With the removal of these two metrics, we expected the accuracy to increase as the weight of remaining lexical-overlap metrics (especially \texttt{fuzzy\_ratio}) would increase, effectively making the classifier more sensitive to surface-level similarity which aligns well with our dataset.
+
+Observing the results of the past experiments, we realized how as the weight of \texttt{fuzzy\_ratio} increased, the results improved. We were interested about the effect on using \texttt{fuzzy\_ratio} as the sole metric for scoring, which we carried out in our fifth and final experiment. The results of the experiment matched our hypothesis as it surpassed the past experiments in accuracy, recall and F1 score. The other metrics were adding noise as their rewarding methods are not aligned with the nature of our dataset as \texttt{jaccard} was too harsh on subtle differences and \texttt{cosine} was struggling with insufficient tokens due to the short text. We concluded that short-answer questions in our dataset reward surface-level character similarity more than semantic structure or contextual meaning. As \texttt{fuzzy\_ratio} does this well without being too harsh, it produces the best result when used alone for this dataset.
+
 \subsection{BERT-Based Classifier}
 
 \subsection{LLM-Based Model}
@@ -119,6 +139,16 @@ related to the idea being tested.
 \section{Results and Discussion}
 
 \subsection{Rule-Based Model}
+
+For Experiment 1, the execution of the Train split achieved an accuracy of 69.56\% and the execution of the Test split achieved an accuracy of 76.95. These results are satisfactory as although the model rarely makes false positives, it misses nearly half of the true positives.
+
+For Experiment 2, both the accuracy results of the Train and Test splits improved. Accuracy of Train split, 71.02\%, and accuracy of Test split, 78.30\%. Although we are achieving a better score of accuracy, the recall is still lagging behind.
+
+For Experiment 3, the removal of \texttt{semantic} led to an even greater weightage on \texttt{fuzzy\_ratio}, which improved the accuracy, precision and recall. We managed to lower our number of false positives, but we are still losing a large section of true positives.
+
+For Experiment 4, we achieved our best accuracy score with multiple scoring metrics as our accuracy was 78.32\%, just 0.02\% better than the next best accuracy score. However, our recall remained approximately the same.
+
+For our last experiment, we solely used \texttt{fuzzy\_ratio}. The results of this experiment recorded the best accuracy at 80.05\% and recall at 63\%, a 6\% increase from previous recall scores. We believe this is our best model as although the ability to prevent false positives declined (precision dropped from 0.98 to 0.93), the model improved its ability to prevent misprediction of true positives (recall increased from 56\% to 63\%).
 
 \subsection{BERT-Based Classifier}
 
@@ -173,6 +203,53 @@ One-shot (lex) & Test  & 0.6713 & 0.5462 & 0.5316 \\
 \end{tabularx}
 \caption{LLM-based classification results for zero-shot, one-shot, and improved one-shot prompting setups.}
 \label{tab:llm_results}
+\end{table}
+
+\section{Rule Based Results}
+
+\begin{table}[h!]
+    \centering
+    \small
+    \begin{tabularx}{\linewidth}{l c c}
+    \hline
+    \textbf{Experiment} & \textbf{Metrics} \\
+    \hline
+         1 & All 5 metrics: fuzzy\_ratio, jaccard, \\&semantic, cosine, num\_match \\
+         2 & Without num\_match \\
+         3 & Without semantic \\
+         4 & Without num\_match \& semantic \\
+         5 & Only fuzzy\_ratio \\
+    \hline
+    \end{tabularx}
+    \caption{Legends for metrics used in the experiments conducted}
+    \label{tab:placeholder}
+\end{table}
+
+\begin{table}[h!]
+    \centering
+    \small
+    \begin{tabularx}{\linewidth}{l c c c c c}
+    \hline
+    \textbf{Experiment} & \textbf{Split} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} \\
+    \hline
+         1 & Train & 0.6956 & 0.97 & 0.49  \\
+         1 & Test & 0.7695 & 0.97 & 0.52 \\
+    \hline
+         2 & Train & 0.7102 & 0.96 & 0.52 \\
+         2 & Test & 0.7830 & 0.96 & 0.56 \\
+    \hline
+         3 & Train & 0.6938 & 0.98 & 0.48 \\
+         3 & Test & 0.7734 & 0.98 & 0.53 \\
+    \hline
+         4 & Train & 0.7009 & 0.97 & 0.50 \\
+         4 & Test & 0.7832 & 0.97 & 0.55 \\
+    \hline
+        5 & Train & 0.7387 & 0.93 & 0.60 \\
+        5 & Test & 0.8055 & 0.93 & 0.63 \\
+    \hline
+    \end{tabularx}
+    \caption{Test and train results for experiments 1, 2, 3, 4 and 5}
+    \label{tab:placeholder}
 \end{table}
 
 
