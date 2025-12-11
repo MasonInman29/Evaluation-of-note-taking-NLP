@@ -13,8 +13,7 @@ from prompts import build_prompt_zero_shot, build_prompt_one_shot
 
 
 # Load HF token from .env
-
-load_dotenv() 
+load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 if HF_TOKEN is None:
@@ -22,7 +21,6 @@ if HF_TOKEN is None:
 
 
 # Load LLaMA 3 model
-
 MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
 
 print(f"Loading LLaMA 3 model: {MODEL_NAME}")
@@ -44,12 +42,81 @@ model.eval()
 print(f"LLaMA 3 loaded. Using device: {device}")
 
 
-# Helper functions 
+# ----------------------
+# Helper functions
+# ----------------------
+
+# A small stopword list to make lexical overlap focus on content words
+STOPWORDS = {
+    "the", "a", "an", "and", "or", "to", "of", "in", "on", "for",
+    "is", "are", "was", "were", "be", "been", "being", "it", "this",
+    "that", "these", "those", "as", "by", "at", "from", "with"
+}
+
+
+def chunk_note_text(note: str, max_note_tokens: int = 256, stride: int = 192) -> list[str]:
+    """
+    Split a long note into overlapping chunks in token space.
+
+    Args:
+        note: full note text for a single segment.
+        max_note_tokens: maximum number of tokens for a single note chunk.
+        stride: how many tokens to move the window each step
+                (stride < max_note_tokens gives overlap).
+
+    Returns:
+        List of chunk texts. For short notes, this is just [note].
+    """
+    # Tokenize only the note text, no special tokens
+    enc = tokenizer(
+        note,
+        add_special_tokens=False,
+        return_tensors="pt",
+    )["input_ids"][0]
+
+    if len(enc) <= max_note_tokens:
+        return [note]
+
+    chunks = []
+    start = 0
+    while start < len(enc):
+        end = start + max_note_tokens
+        chunk_ids = enc[start:end]
+        chunk_text = tokenizer.decode(chunk_ids, skip_special_tokens=True)
+        chunks.append(chunk_text)
+
+        if end >= len(enc):
+            break
+        start += stride
+
+    return chunks
+
+
+def truncate_text(text: str, max_tokens: int = 192) -> str:
+    """
+    Truncate a long text to at most `max_tokens` tokens in model token space.
+
+    Used for example notes in one-shot prompting so the example
+    does not dominate the prompt and push the query off the end.
+    """
+    enc = tokenizer(
+        text,
+        add_special_tokens=False,
+        return_tensors="pt",
+    )["input_ids"][0]
+
+    if len(enc) <= max_tokens:
+        return text
+
+    trunc_ids = enc[:max_tokens]
+    return tokenizer.decode(trunc_ids, skip_special_tokens=True)
+
 
 def lexical_overlap_score(idea: str, note: str) -> float:
     """
     Simple lexical overlap between IdeaUnit and note.
     Score = (# of idea tokens that appear in note) / (# of idea tokens).
+    Uses a small stopword list so we focus more on content words.
     """
     idea_tokens = (
         idea.lower()
@@ -66,8 +133,8 @@ def lexical_overlap_score(idea: str, note: str) -> float:
         .split()
     )
 
-    idea_tokens = {t for t in idea_tokens if t}
-    note_tokens = {t for t in note_tokens if t}
+    idea_tokens = {t for t in idea_tokens if t and t not in STOPWORDS}
+    note_tokens = {t for t in note_tokens if t and t not in STOPWORDS}
 
     if not idea_tokens:
         return 0.0
@@ -79,7 +146,7 @@ def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
     """
     Select one example row per Topic from the training data.
 
-    Improved strategy:
+    Strategy:
     - Group by Topic.
     - For each Topic:
         * Filter to rows with non-empty segment_text.
@@ -88,12 +155,6 @@ def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
           between IdeaUnit and segment_text.
         * If no positives exist for that Topic, fall back to the non-empty
           example with highest overlap.
-
-    This automatically finds "cleanest" examples like:
-        - Physics:   "the smallest quantity of energy is quantum ..."
-        - Statistics:"retrospective go back in time data already collected"
-        - Ecology:   "feather eyes around ..."
-        - CompSci:   CU / control unit description
 
     Returns:
         dict: { topic: example_row }
@@ -151,7 +212,7 @@ def call_llm(prompt: str) -> int:
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=512,
+            max_length=1024,  # increased from 512 to keep query + Answer visible
         ).to(model.device)
 
         outputs = model(**inputs)
@@ -208,26 +269,43 @@ def run_llm_classifier(
 
     for _, row in tqdm(df.iterrows(), total=n):
         idea = str(row["IdeaUnit"])
-        note = str(row["segment_text"])
+        full_note = str(row["segment_text"])
         topic = row["Topic"]
 
+        # Prepare one-shot example if needed
         if mode == "one_shot":
             ex = examples_by_topic[topic]
             ex_idea = str(ex["IdeaUnit"])
-            ex_note = str(ex["segment_text"])
+            # truncate example note so it doesn't dominate the prompt
+            ex_note_raw = str(ex["segment_text"])
+            ex_note = truncate_text(ex_note_raw, max_tokens=192)
             ex_label = int(ex["label"])
-
-            prompt = build_prompt_one_shot(
-                idea=idea,
-                note=note,
-                ex_idea=ex_idea,
-                ex_note=ex_note,
-                ex_label=ex_label,
-            )
         else:
-            prompt = build_prompt_zero_shot(idea=idea, note=note)
+            ex_idea = ex_note = None
+            ex_label = 0  # dummy
 
-        pred_label = call_llm(prompt)
+        # 1) Break the note into token-level chunks
+        note_chunks = chunk_note_text(full_note, max_note_tokens=256, stride=192)
+
+        # 2) Run the LLM on each chunk and aggregate
+        window_preds = []
+        for note_chunk in note_chunks:
+            if mode == "one_shot":
+                prompt = build_prompt_one_shot(
+                    idea=idea,
+                    note=note_chunk,
+                    ex_idea=ex_idea,
+                    ex_note=ex_note,
+                    ex_label=ex_label,
+                )
+            else:
+                prompt = build_prompt_zero_shot(idea=idea, note=note_chunk)
+
+            window_pred = call_llm(prompt)
+            window_preds.append(window_pred)
+
+        # 3) Final prediction: YES if any window says YES
+        pred_label = 1 if any(p == 1 for p in window_preds) else 0
         preds.append(pred_label)
 
     # Attach predictions
