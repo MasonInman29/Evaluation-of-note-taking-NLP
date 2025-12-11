@@ -151,7 +151,7 @@ def call_llm(prompt: str) -> int:
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=512,
+            max_length=1024,  # safer for long notes
         ).to(model.device)
 
         outputs = model(**inputs)
@@ -163,7 +163,6 @@ def call_llm(prompt: str) -> int:
 
     # Higher logit = higher probability
     return 1 if yes_logit > no_logit else 0
-
 
 def run_llm_classifier(
     data_dir: str,
