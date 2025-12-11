@@ -46,7 +46,6 @@ print(f"LLaMA 3 loaded. Using device: {device}")
 # Helper functions
 # ----------------------
 
-# A small stopword list to make lexical overlap focus on content words
 STOPWORDS = {
     "the", "a", "an", "and", "or", "to", "of", "in", "on", "for",
     "is", "are", "was", "were", "be", "been", "being", "it", "this",
@@ -55,24 +54,8 @@ STOPWORDS = {
 
 
 def chunk_note_text(note: str, max_note_tokens: int = 256, stride: int = 192) -> list[str]:
-    """
-    Split a long note into overlapping chunks in token space.
-
-    Args:
-        note: full note text for a single segment.
-        max_note_tokens: maximum number of tokens for a single note chunk.
-        stride: how many tokens to move the window each step
-                (stride < max_note_tokens gives overlap).
-
-    Returns:
-        List of chunk texts. For short notes, this is just [note].
-    """
-    # Tokenize only the note text, no special tokens
-    enc = tokenizer(
-        note,
-        add_special_tokens=False,
-        return_tensors="pt",
-    )["input_ids"][0]
+    """ Split long note text into overlapping token windows. """
+    enc = tokenizer(note, add_special_tokens=False, return_tensors="pt")["input_ids"][0]
 
     if len(enc) <= max_note_tokens:
         return [note]
@@ -93,17 +76,8 @@ def chunk_note_text(note: str, max_note_tokens: int = 256, stride: int = 192) ->
 
 
 def truncate_text(text: str, max_tokens: int = 192) -> str:
-    """
-    Truncate a long text to at most `max_tokens` tokens in model token space.
-
-    Used for example notes in one-shot prompting so the example
-    does not dominate the prompt and push the query off the end.
-    """
-    enc = tokenizer(
-        text,
-        add_special_tokens=False,
-        return_tensors="pt",
-    )["input_ids"][0]
+    """Truncate overly long example notes so they don't dominate the prompt."""
+    enc = tokenizer(text, add_special_tokens=False, return_tensors="pt")["input_ids"][0]
 
     if len(enc) <= max_tokens:
         return text
@@ -113,28 +87,15 @@ def truncate_text(text: str, max_tokens: int = 192) -> str:
 
 
 def lexical_overlap_score(idea: str, note: str) -> float:
-    """
-    Simple lexical overlap between IdeaUnit and note.
-    Score = (# of idea tokens that appear in note) / (# of idea tokens).
-    Uses a small stopword list so we focus more on content words.
-    """
-    idea_tokens = (
-        idea.lower()
-        .replace(".", " ")
-        .replace(",", " ")
-        .replace(";", " ")
-        .split()
-    )
-    note_tokens = (
-        note.lower()
-        .replace(".", " ")
-        .replace(",", " ")
-        .replace(";", " ")
-        .split()
-    )
-
-    idea_tokens = {t for t in idea_tokens if t and t not in STOPWORDS}
-    note_tokens = {t for t in note_tokens if t and t not in STOPWORDS}
+    """Compute lexical overlap, ignoring stopwords."""
+    idea_tokens = {
+        t for t in idea.lower().replace(".", " ").replace(",", " ").split()
+        if t and t not in STOPWORDS
+    }
+    note_tokens = {
+        t for t in note.lower().replace(".", " ").replace(",", " ").split()
+        if t and t not in STOPWORDS
+    }
 
     if not idea_tokens:
         return 0.0
@@ -143,223 +104,140 @@ def lexical_overlap_score(idea: str, note: str) -> float:
 
 
 def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
-    """
-    Select one example row per Topic from the training data.
-
-    Strategy:
-    - Group by Topic.
-    - For each Topic:
-        * Filter to rows with non-empty segment_text.
-        * Prefer positive examples (label == 1).
-        * Among positives, choose the one with the highest lexical overlap
-          between IdeaUnit and segment_text.
-        * If no positives exist for that Topic, fall back to the non-empty
-          example with highest overlap.
-
-    Returns:
-        dict: { topic: example_row }
-    """
+    """Select one representative example per topic, preferring clean positive examples."""
     examples = {}
-
-    # Ensure text columns are strings
     train_df = train_df.copy()
     train_df["segment_text"] = train_df["segment_text"].fillna("").astype(str)
     train_df["IdeaUnit"] = train_df["IdeaUnit"].astype(str)
 
     for topic, group in train_df.groupby("Topic"):
         group = group.copy()
-
-        # Only consider rows with actual note text
         non_empty = group[group["segment_text"].str.strip() != ""]
+
         if len(non_empty) == 0:
-            # Fallback: no usable text, just pick the first row
             examples[topic] = group.iloc[0]
             continue
 
-        # First try positives
-        pos = non_empty[non_empty["label"] == 1].copy()
-        target_df = pos if len(pos) > 0 else non_empty.copy()
+        pos = non_empty[non_empty["label"] == 1]
+        target_df = pos if len(pos) > 0 else non_empty
 
-        # Compute lexical overlap for each candidate
         target_df["overlap"] = target_df.apply(
-            lambda r: lexical_overlap_score(str(r["IdeaUnit"]), str(r["segment_text"])),
+            lambda r: lexical_overlap_score(r["IdeaUnit"], r["segment_text"]),
             axis=1,
         )
 
-        # Pick the single best example (highest overlap)
-        best_row = target_df.sort_values("overlap", ascending=False).iloc[0]
-        examples[topic] = best_row
+        examples[topic] = target_df.sort_values("overlap", ascending=False).iloc[0]
 
     return examples
 
 
-# Precompute token IDs for " YES" and " NO" once (not every call)
+# ---- Precompute token IDs for YES/NO ----
 YES_TOKEN_ID = tokenizer(" YES", add_special_tokens=False)["input_ids"][0]
 NO_TOKEN_ID = tokenizer(" NO", add_special_tokens=False)["input_ids"][0]
 
 
-def call_llm(prompt: str) -> int:
+def call_llm_score(prompt: str) -> float:
     """
-    Classify with LLaMA 3 by comparing the logits for ' YES' vs ' NO'
-    as the next token after the prompt.
-
-    Returns:
-        1 for YES,
-        0 for NO.
+    Return a continuous score = yes_logit - no_logit.
+    Positive score => YES is more likely.
     """
     with torch.no_grad():
         inputs = tokenizer(
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=1024,  # increased from 512 to keep query + Answer visible
+            max_length=1024,
         ).to(model.device)
 
         outputs = model(**inputs)
-        # logits for the next token (last position)
-        logits_last = outputs.logits[0, -1]  # shape: [vocab_size]
+        logits_last = outputs.logits[0, -1]
 
     yes_logit = logits_last[YES_TOKEN_ID].item()
-    no_logit = logits_last[NO_TOKEN_ID].item()
+    no_logit  = logits_last[NO_TOKEN_ID].item()
 
-    # Higher logit = higher probability
-    return 1 if yes_logit > no_logit else 0
+    return yes_logit - no_logit
 
 
-def run_llm_classifier(
-    data_dir: str,
-    split: str,
-    output_path: str,
-    mode: str,
-):
-    """
-    Run the LLM classifier on either the train or test split.
+# ----------------------
+# Main classifier logic
+# ----------------------
 
-    Args:
-        data_dir: folder with Notes.csv, train.csv, test.csv
-        split: 'train' or 'test'
-        mode: 'zero_shot' or 'one_shot'
-        output_path: where to save the CSV with predictions
-    """
-    # Load raw CSVs
+def run_llm_classifier(data_dir: str, split: str, output_path: str, mode: str):
+    """Run the LLM classifier and produce continuous scores for threshold tuning."""
     notes, train_raw, test_raw = load_data(data_dir=data_dir)
 
-    # Add 'segment_text' column to train and test using Notes.csv
     train = add_segment_text(train_raw, notes)
-    test = add_segment_text(test_raw, notes)
+    test  = add_segment_text(test_raw, notes)
 
-    # Choose which split to run on
-    if split == "train":
-        df = train.copy()
-    elif split == "test":
-        df = test.copy()
-    else:
-        raise ValueError("split must be 'train' or 'test'")
+    df = train.copy() if split == "train" else test.copy()
 
-    # Prepare one-shot examples if needed
     if mode == "one_shot":
         examples_by_topic = select_one_shot_examples(train)
     else:
         examples_by_topic = None
 
-    preds = []
+    scores = []
     n = len(df)
 
-    print(f"Running LLaMA 3 classifier on {split} split with mode={mode}, n={n} rows")
+    print(f"Running LLaMA classifier ({mode}) on {split} split, n={n}")
 
     for _, row in tqdm(df.iterrows(), total=n):
         idea = str(row["IdeaUnit"])
         full_note = str(row["segment_text"])
         topic = row["Topic"]
 
-        # Prepare one-shot example if needed
         if mode == "one_shot":
             ex = examples_by_topic[topic]
             ex_idea = str(ex["IdeaUnit"])
-            # truncate example note so it doesn't dominate the prompt
-            ex_note_raw = str(ex["segment_text"])
-            ex_note = truncate_text(ex_note_raw, max_tokens=192)
+            ex_note = truncate_text(str(ex["segment_text"]), max_tokens=192)
             ex_label = int(ex["label"])
         else:
             ex_idea = ex_note = None
-            ex_label = 0  # dummy
+            ex_label = 0
 
-        # 1) Break the note into token-level chunks
         note_chunks = chunk_note_text(full_note, max_note_tokens=256, stride=192)
 
-        # 2) Run the LLM on each chunk and aggregate
-        window_preds = []
-        for note_chunk in note_chunks:
+        window_scores = []
+        for chunk in note_chunks:
             if mode == "one_shot":
                 prompt = build_prompt_one_shot(
                     idea=idea,
-                    note=note_chunk,
+                    note=chunk,
                     ex_idea=ex_idea,
                     ex_note=ex_note,
                     ex_label=ex_label,
                 )
             else:
-                prompt = build_prompt_zero_shot(idea=idea, note=note_chunk)
+                prompt = build_prompt_zero_shot(idea=idea, note=chunk)
 
-            window_pred = call_llm(prompt)
-            window_preds.append(window_pred)
+            score = call_llm_score(prompt)
+            window_scores.append(score)
 
-        # 3) Final prediction: YES if any window says YES
-        pred_label = 1 if any(p == 1 for p in window_preds) else 0
-        preds.append(pred_label)
+        # Aggregate: best (max) window score
+        sample_score = max(window_scores)
+        scores.append(sample_score)
 
-    # Attach predictions
-    df["pred_llm"] = preds
+    df["llm_score"] = scores
 
-    # Keep useful columns
-    cols_to_keep = ["Topic", "ID", "Segment", "IdeaUnit", "pred_llm"]
+    cols = ["Topic", "ID", "Segment", "IdeaUnit", "llm_score"]
     if "label" in df.columns:
-        cols_to_keep.append("label")  # available for train/test if present
+        cols.append("label")
 
-    out_df = df[cols_to_keep]
+    out_df = df[cols]
 
-    # Ensure output directory exists
-    parent_dir = os.path.dirname(output_path)
-    if parent_dir:
-        os.makedirs(parent_dir, exist_ok=True)
-
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     out_df.to_csv(output_path, index=False)
-    print(f"Saved predictions to {output_path}")
 
-    # If labels exist (train or test split with labels), print a quick accuracy
-    if "label" in out_df.columns:
-        acc = (out_df["pred_llm"] == out_df["label"]).mean()
-        print(f"Accuracy on {split} split: {acc:.4f}")
+    print(f"Saved LLM scores to {output_path}")
+
 
 
 def main():
-    parser = argparse.ArgumentParser(description="LLaMA 3-based note coverage classifier")
-    parser.add_argument(
-        "--data_dir",
-        type=str,
-        default="data",
-        help="Directory containing Notes.csv, train.csv, test.csv",
-    )
-    parser.add_argument(
-        "--split",
-        type=str,
-        choices=["train", "test"],
-        default="test",
-        help="Which split to run on (train or test).",
-    )
-    parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["zero_shot", "one_shot"],
-        default="one_shot",
-        help="LLM prompting mode.",
-    )
-    parser.add_argument(
-        "--output_path",
-        type=str,
-        default="outputs/llama3_predictions.csv",
-        help="Path to save CSV with predictions.",
-    )
+    parser = argparse.ArgumentParser(description="LLaMA 3-based IdeaUnit coverage scorer")
+    parser.add_argument("--data_dir", type=str, default="data")
+    parser.add_argument("--split", type=str, choices=["train", "test"], default="test")
+    parser.add_argument("--mode", type=str, choices=["zero_shot", "one_shot"], default="one_shot")
+    parser.add_argument("--output_path", type=str, default="outputs/llama3_scores.csv")
     args = parser.parse_args()
 
     run_llm_classifier(
