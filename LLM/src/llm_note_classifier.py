@@ -54,7 +54,7 @@ STOPWORDS = {
 
 
 def chunk_note_text(note: str, max_note_tokens: int = 256, stride: int = 192) -> list[str]:
-    """ Split long note text into overlapping token windows. """
+    """Split long note text into overlapping token windows."""
     enc = tokenizer(note, add_special_tokens=False, return_tensors="pt")["input_ids"][0]
 
     if len(enc) <= max_note_tokens:
@@ -121,6 +121,7 @@ def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
         pos = non_empty[non_empty["label"] == 1]
         target_df = pos if len(pos) > 0 else non_empty
 
+        target_df = target_df.copy()
         target_df["overlap"] = target_df.apply(
             lambda r: lexical_overlap_score(r["IdeaUnit"], r["segment_text"]),
             axis=1,
@@ -131,31 +132,62 @@ def select_one_shot_examples(train_df: pd.DataFrame) -> dict:
     return examples
 
 
-# ---- Precompute token IDs for YES/NO ----
-YES_TOKEN_ID = tokenizer(" YES", add_special_tokens=False)["input_ids"][0]
-NO_TOKEN_ID = tokenizer(" NO", add_special_tokens=False)["input_ids"][0]
+# ----------------------
+# YES / NO sequence log-probabilities
+# ----------------------
+
+def completion_logprob(prompt: str, answer_text: str, max_length: int = 1024) -> float:
+    """
+    Compute the log-probability of `answer_text` as a continuation of `prompt`.
+
+    We:
+    - tokenize prompt and answer separately (no special tokens)
+    - truncate from the LEFT if total length > max_length (keep the answer)
+    - run the model once on [prompt_ids + answer_ids]
+    - sum log-softmax probabilities for the answer tokens.
+    """
+    # Tokenize as plain sequences (Python lists of ids)
+    prompt_ids = tokenizer.encode(prompt, add_special_tokens=False)
+    answer_ids = tokenizer.encode(answer_text, add_special_tokens=False)
+
+    # If too long, truncate the prompt from the left (keep the answer intact)
+    total_len = len(prompt_ids) + len(answer_ids)
+    if total_len > max_length:
+        overflow = total_len - max_length
+        prompt_ids = prompt_ids[overflow:]
+
+    input_ids = torch.tensor([prompt_ids + answer_ids], device=model.device)
+
+    with torch.no_grad():
+        outputs = model(input_ids=input_ids)
+        logits = outputs.logits  # [1, seq_len, vocab_size]
+
+    # For each answer token, use the logits from the previous position
+    # Example:
+    # token at index L (first answer token) uses logits at position L-1
+    prompt_len = len(prompt_ids)
+    logprob = 0.0
+
+    for i, token_id in enumerate(answer_ids):
+        pos = prompt_len - 1 + i
+        token_logits = logits[0, pos, :]  # [vocab_size]
+        log_probs = torch.log_softmax(token_logits, dim=-1)
+        logprob += log_probs[token_id].item()
+
+    return logprob
 
 
 def call_llm_score(prompt: str) -> float:
     """
-    Return a continuous score = yes_logit - no_logit.
-    Positive score => YES is more likely.
+    Return a continuous score = log p(YES | prompt) - log p(NO | prompt),
+    where YES/NO are treated as full token sequences.
+
+    Positive score => YES is more likely than NO.
+    Negative score => NO is more likely.
     """
-    with torch.no_grad():
-        inputs = tokenizer(
-            prompt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=1024,
-        ).to(model.device)
-
-        outputs = model(**inputs)
-        logits_last = outputs.logits[0, -1]
-
-    yes_logit = logits_last[YES_TOKEN_ID].item()
-    no_logit  = logits_last[NO_TOKEN_ID].item()
-
-    return yes_logit - no_logit
+    yes_lp = completion_logprob(prompt, " YES")
+    no_lp = completion_logprob(prompt, " NO")
+    return yes_lp - no_lp
 
 
 # ----------------------
@@ -167,7 +199,7 @@ def run_llm_classifier(data_dir: str, split: str, output_path: str, mode: str):
     notes, train_raw, test_raw = load_data(data_dir=data_dir)
 
     train = add_segment_text(train_raw, notes)
-    test  = add_segment_text(test_raw, notes)
+    test = add_segment_text(test_raw, notes)
 
     df = train.copy() if split == "train" else test.copy()
 
@@ -229,7 +261,6 @@ def run_llm_classifier(data_dir: str, split: str, output_path: str, mode: str):
     out_df.to_csv(output_path, index=False)
 
     print(f"Saved LLM scores to {output_path}")
-
 
 
 def main():
