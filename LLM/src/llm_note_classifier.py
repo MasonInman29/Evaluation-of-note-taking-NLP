@@ -46,6 +46,43 @@ print(f"LLaMA 3 loaded. Using device: {device}")
 
 # Helper functions 
 
+def chunk_note_text(note: str, max_note_tokens: int = 256, stride: int = 192) -> list[str]:
+    """
+    Split a long note into overlapping chunks in token space.
+
+    Args:
+        note: full note text for a single segment.
+        max_note_tokens: maximum number of tokens for a single note chunk.
+        stride: how many tokens to move the window each step
+                (stride < max_note_tokens gives overlap).
+
+    Returns:
+        List of chunk texts. For short notes, this is just [note].
+    """
+    # Tokenize only the note text, no special tokens
+    enc = tokenizer(
+        note,
+        add_special_tokens=False,
+        return_tensors="pt",
+    )["input_ids"][0]
+
+    if len(enc) <= max_note_tokens:
+        return [note]
+
+    chunks = []
+    start = 0
+    while start < len(enc):
+        end = start + max_note_tokens
+        chunk_ids = enc[start:end]
+        chunk_text = tokenizer.decode(chunk_ids, skip_special_tokens=True)
+        chunks.append(chunk_text)
+
+        if end >= len(enc):
+            break
+        start += stride
+
+    return chunks
+
 def lexical_overlap_score(idea: str, note: str) -> float:
     """
     Simple lexical overlap between IdeaUnit and note.
@@ -208,26 +245,41 @@ def run_llm_classifier(
 
     for _, row in tqdm(df.iterrows(), total=n):
         idea = str(row["IdeaUnit"])
-        note = str(row["segment_text"])
+        full_note = str(row["segment_text"])
         topic = row["Topic"]
 
+        # Prepare one-shot example if needed
         if mode == "one_shot":
             ex = examples_by_topic[topic]
             ex_idea = str(ex["IdeaUnit"])
             ex_note = str(ex["segment_text"])
             ex_label = int(ex["label"])
-
-            prompt = build_prompt_one_shot(
-                idea=idea,
-                note=note,
-                ex_idea=ex_idea,
-                ex_note=ex_note,
-                ex_label=ex_label,
-            )
         else:
-            prompt = build_prompt_zero_shot(idea=idea, note=note)
+            ex_idea = ex_note = None
+            ex_label = 0  # dummy
 
-        pred_label = call_llm(prompt)
+        # 1) Break the note into token-level chunks
+        note_chunks = chunk_note_text(full_note, max_note_tokens=256, stride=192)
+
+        # 2) Run the LLM on each chunk and aggregate
+        window_preds = []
+        for note_chunk in note_chunks:
+            if mode == "one_shot":
+                prompt = build_prompt_one_shot(
+                    idea=idea,
+                    note=note_chunk,
+                    ex_idea=ex_idea,
+                    ex_note=ex_note,
+                    ex_label=ex_label,
+                )
+            else:
+                prompt = build_prompt_zero_shot(idea=idea, note=note_chunk)
+
+            window_pred = call_llm(prompt)
+            window_preds.append(window_pred)
+
+        # 3) Final prediction: YES if any window says YES
+        pred_label = 1 if any(p == 1 for p in window_preds) else 0
         preds.append(pred_label)
 
     # Attach predictions
