@@ -1,37 +1,30 @@
 def build_prompt_zero_shot(idea: str, note: str) -> str:
     """
-    Zero-shot prompt with explicit guidance for noisy student notes.
+    Balanced prompt: allow paraphrases & semantic matches,
+    but forbid vague partial hints or inferred meaning.
     """
     idea = idea.strip()
     note = note.strip()
 
-    return f"""You are grading whether a student's note contains a specific idea from a lecture.
+    return f"""You are determining whether a student's note contains a specific idea from a lecture.
 
-The notes are often noisy: they may contain misspellings, abbreviations, partial words,
-or informal shorthand (for example, "def" for "definition", "ex" for "example",
-"ALU" for "arithmetic logic unit"). They can also omit function words, repeat phrases,
-or mix relevant and irrelevant information.
+Notes may contain shorthand, spelling errors, or informal phrasing. You SHOULD allow:
+• Paraphrasing (different wording but same meaning)
+• Misspellings that clearly refer to the same term
+• Abbreviations that are unambiguous
+• Conceptually equivalent statements
 
-Follow these rules:
+However, do NOT infer meaning that is not actually there. The idea is NOT present when:
+• Only one or two keywords appear without expressing the idea
+• The note vaguely hints at the topic but not the relationship or meaning
+• The note mentions related concepts but not the actual idea
+• Meaning is incomplete or ambiguous
 
-1. Focus on meaning, not exact wording. If the note clearly expresses the same idea
-   in different words, treat the idea as present.
-2. If a word in the note is slightly misspelled but obviously refers to a term in the idea,
-   treat it as a match.
-3. If the note uses an abbreviation or acronym that unambiguously refers to the concept
-   in the idea, treat it as a match.
-4. The idea counts as present if the central concept and its main relationship are stated,
-   even if some minor details are missing.
-5. If the note only vaguely hints at the idea or mentions isolated words without conveying
-   the main point, treat the idea as NOT present.
-6. Do not assume missing information. Only consider what is explicitly stated in the note.
+Decision rules:
+- Answer YES if the note expresses the same idea in any clear form.
+- Answer NO if the idea is missing, incomplete, vague, or only suggested indirectly.
 
-After applying these rules:
-- If the idea is clearly present in the note, answer "YES".
-- If the idea is missing or too incomplete, answer "NO".
-
-Your final answer must be exactly one token: YES or NO.
-Do NOT include any explanation or extra text.
+Your answer must be exactly one token: YES or NO.
 
 [QUERY]
 IDEA:
@@ -50,7 +43,8 @@ def build_prompt_one_shot(
     ex_label: int,
 ) -> str:
     """
-    One-shot prompt with noise-handling rules and a labeled example.
+    Balanced one-shot prompt with support for paraphrases
+    but strictness against vague matches.
     """
     idea = idea.strip()
     note = note.strip()
@@ -59,26 +53,18 @@ def build_prompt_one_shot(
 
     ex_label_str = "YES" if ex_label == 1 else "NO"
 
-    return f"""You are grading whether a student's note contains a specific idea from a lecture.
+    return f"""You are determining whether a student's note contains a specific lecture idea.
 
-The notes are often noisy: they may contain misspellings, abbreviations, partial words,
-or informal shorthand (for example, "def" for "definition", "ex" for "example",
-"ALU" for "arithmetic logic unit"). They can also omit function words, repeat phrases,
-or mix relevant and irrelevant information.
+Notes may include shorthand, misspellings, or paraphrases. You SHOULD allow:
+• Different wording that conveys the same meaning
+• Misspellings or informal abbreviations that clearly match the idea
+• Equivalent statements or conceptually accurate summaries
 
-Follow these rules:
-
-1. Focus on meaning, not exact wording. If the note clearly expresses the same idea
-   in different words, treat the idea as present.
-2. If a word in the note is slightly misspelled but obviously refers to a term in the idea,
-   treat it as a match.
-3. If the note uses an abbreviation or acronym that unambiguously refers to the concept
-   in the idea, treat it as a match.
-4. The idea counts as present if the central concept and its main relationship are stated,
-   even if some minor details are missing.
-5. If the note only vaguely hints at the idea or mentions isolated words without conveying
-   the main point, treat the idea as NOT present.
-6. Do not assume missing information. Only consider what is explicitly stated in the note.
+However, the idea is NOT present when:
+• Only keywords appear without conveying the idea's meaning
+• The note only hints at the topic without the core concept
+• The relationship or main point of the idea is missing
+• The wording is too incomplete to express the idea
 
 Here is one labeled example from the same topic:
 
@@ -91,7 +77,7 @@ NOTE:
 
 Correct label: {ex_label_str}
 
-Now grade the new note.
+Now apply the same rules to the new note.
 
 [QUERY]
 IDEA:
@@ -101,6 +87,5 @@ NOTE:
 {note}
 
 Your final answer must be exactly one token: YES or NO.
-Do NOT include any explanation or extra text.
 
 Answer:"""
