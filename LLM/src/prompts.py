@@ -1,18 +1,39 @@
 def build_prompt_zero_shot(idea: str, note: str) -> str:
     """
-    Zero-shot prompt: only instruction + (IdeaUnit, note).
+    Zero-shot prompt: instruction + (IdeaUnit, note), with explicit guidance
+    for noisy, shorthand student notes.
     """
     idea = idea.strip()
     note = note.strip()
 
     return f"""You are grading whether a student's note contains a specific idea from a lecture.
 
-- If the idea is clearly present (even if the wording is different), answer "YES".
-- If the idea is missing or only vaguely hinted at, answer "NO".
+The notes are often noisy: they may contain misspellings, abbreviations, partial words,
+or informal shorthand (for example, "def" for "definition", "ex" for "example",
+"ALU" for "arithmetic logic unit"). They can also omit function words, repeat phrases,
+or mix relevant and irrelevant information.
+
+Follow these rules:
+
+1. Focus on meaning, not exact wording. If the note clearly expresses the same idea
+   in different words, treat the idea as present.
+2. If a word in the note is slightly misspelled but obviously refers to a term in the idea,
+   treat it as a match.
+3. If the note uses an abbreviation or acronym that unambiguously refers to the concept
+   in the idea, treat it as a match.
+4. The idea counts as present if the central concept and its main relationship are stated,
+   even if some minor details are missing.
+5. If the note only hints at the idea vaguely or mentions a few isolated words without
+   conveying the main point, treat the idea as NOT present.
+
+After applying these rules:
+- If the idea is clearly present in the note, answer "YES".
+- If the idea is missing, only weakly implied, or too incomplete, answer "NO".
 
 Reply with exactly one word: YES or NO.
 Do NOT include any explanation or extra text.
 
+[QUERY]
 IDEA:
 {idea}
 
