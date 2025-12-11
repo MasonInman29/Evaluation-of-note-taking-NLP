@@ -1,6 +1,6 @@
 def build_prompt_zero_shot(idea: str, note: str) -> str:
     """
-    Balanced prompt: allow paraphrases & semantic matches,
+    Zero-shot prompt that allow paraphrases & semantic matches,
     but forbid vague partial hints or inferred meaning.
     """
     idea = idea.strip()
@@ -47,7 +47,7 @@ def build_prompt_one_shot(
     ex_label: int,
 ) -> str:
     """
-    Balanced one-shot prompt with support for paraphrases
+    One-shot prompt with support for paraphrases
     but strictness against vague matches.
     """
     idea = idea.strip()
