@@ -24,6 +24,10 @@ Decision rules:
 - Answer YES if the note expresses the same idea in any clear form.
 - Answer NO if the idea is missing, incomplete, vague, or only suggested indirectly.
 
+IMPORTANT: When you are not completely certain that the idea is expressed,
+you MUST answer "NO". Only answer "YES" when the note clearly includes the full idea.
+Do not guess or infer missing information. When unsure, answer "NO".
+
 Your answer must be exactly one token: YES or NO.
 
 [QUERY]
@@ -65,6 +69,10 @@ However, the idea is NOT present when:
 • The note only hints at the topic without the core concept
 • The relationship or main point of the idea is missing
 • The wording is too incomplete to express the idea
+
+IMPORTANT: When you are not completely certain that the idea is expressed,
+you MUST answer "NO". Only answer "YES" when the note clearly includes the full idea.
+Do not guess or infer missing information. When unsure, answer "NO".
 
 Here is one labeled example from the same topic:
 
