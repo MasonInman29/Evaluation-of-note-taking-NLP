@@ -1,4 +1,5 @@
 import argparse
+
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
@@ -8,24 +9,32 @@ from sklearn.metrics import (
 )
 
 
-def evaluate(pred_path: str, threshold: float):
+def evaluate(pred_path: str):
     df = pd.read_csv(pred_path)
     print(f"Loaded {len(df)} examples from {pred_path}")
 
     if "label" not in df.columns:
-        raise ValueError("Input file must include a 'label' column for evaluation.")
+        raise ValueError(
+            f"'label' column not found in {pred_path}. "
+            "Make sure you ran the classifier on a split that has labels "
+            "(e.g., train or a labeled test set)."
+        )
 
-    if "llm_score" not in df.columns:
-        raise ValueError("Input file must contain 'llm_score' produced by the classifier.")
+    if "pred_llm" not in df.columns:
+        raise ValueError(
+            f"'pred_llm' column not found in {pred_path}. "
+            "Make sure you ran llm_note_classifier.py to produce predictions."
+        )
 
-    # Drop missing labels if any
-    df = df[df["label"].notna()].copy()
+    # Drop rows with missing labels, if any
+    mask = df["label"].notna()
+    if not mask.all():
+        dropped = (~mask).sum()
+        print(f"Warning: dropping {dropped} rows with missing labels before evaluation.")
+    df_eval = df[mask].copy()
 
-    y_true = df["label"].astype(int).values
-    scores = df["llm_score"].values
-
-    # Apply threshold
-    y_pred = (scores > threshold).astype(int)
+    y_true = df_eval["label"].astype(int)
+    y_pred = df_eval["pred_llm"].astype(int)
 
     acc = accuracy_score(y_true, y_pred)
     precision, recall, f1, _ = precision_recall_fscore_support(
@@ -33,7 +42,6 @@ def evaluate(pred_path: str, threshold: float):
     )
     cm = confusion_matrix(y_true, y_pred)
 
-    print(f"\nUsing threshold τ = {threshold:.4f}")
     print(f"Accuracy:  {acc:.4f}")
     print(f"Precision: {precision:.4f}")
     print(f"Recall:    {recall:.4f}")
@@ -46,11 +54,15 @@ def evaluate(pred_path: str, threshold: float):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate LLM classifier with thresholding.")
-    parser.add_argument("--pred_path", type=str, required=True)
-    parser.add_argument("--threshold", type=float, required=True)
+    parser = argparse.ArgumentParser(description="Evaluate LLM predictions.")
+    parser.add_argument(
+        "--pred_path",
+        type=str,
+        required=True,
+        help="Path to CSV file with columns: pred_llm and label.",
+    )
     args = parser.parse_args()
-    evaluate(args.pred_path, args.threshold)
+    evaluate(args.pred_path)
 
 
 if __name__ == "__main__":
