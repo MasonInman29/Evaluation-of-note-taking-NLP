@@ -1,0 +1,256 @@
+<html><head><meta charset='utf-8'><title>Evaluation Report</title></head><body><h1>Evaluation report (2025-12-13T18:33:49.902479 UTC)</h1><h2>Summary metrics</h2><table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>accuracy</th>
+      <th>precision</th>
+      <th>recall</th>
+      <th>f1</th>
+      <th>n_samples</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0.723684</td>
+      <td>0.62963</td>
+      <td>0.971429</td>
+      <td>0.764045</td>
+      <td>76</td>
+    </tr>
+  </tbody>
+</table><h2>Confusion matrix</h2><img src='confusion_matrix.png' style='max-width:700px;'><h2>Confidence & curves</h2><img src='confidence_histogram.png' style='max-width:700px;'><br><img src='precision_recall_curve.png' style='max-width:700px;'><br><img src='roc_curve.png' style='max-width:700px;'><br><h2>Top false positives (CSV)</h2><p>See false_positives_top.csv and false_negatives_top.csv in this folder for examples.</p><h2>Examples (first 20)</h2><table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>true_label</th>
+      <th>pred_label</th>
+      <th>pred_prob_pos</th>
+      <th>text_1</th>
+      <th>text_2</th>
+      <th>ID</th>
+      <th>Segment</th>
+      <th>correct</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0</td>
+      <td>1</td>
+      <td>0.515324</td>
+      <td>Researchers use a sample rather than a population</td>
+      <td>statistics - collect and analyze data q about populations pop = people that makes up interested group ( entire collected objects ) ex : community college students not always possible to obtain populaiton sample - - subset of pop sampling for when you can ' t get entire population n population n sample ( smaller than pop ) ex 5000 pop and sample 50 good sample - - > look like pop ( tricky to accomplish ) two types of stats - descriptive and inferential descript = describes - - > how well company pays the employees ( highest, lowest, maximum, minimum, anything that describes the stats ) infer = predicts - - > tell us about data we don ' t have ( 10 weather stations - say stuff about places that don ' t have weather stations ) descriptive - graphing, describing, tells you something bout sample inferential tells you something about pop not sample ex average wt of people in major compared to campus collect data by random sampling - equally likely to be picked experiement vs direct observation are the two ways to collect data experiments - - > know how to design them</td>
+      <td>6260216</td>
+      <td>1</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0.370683</td>
+      <td>One of the first computers was designed at Iowa State University in 1937 by Atanasoff and Berry.</td>
+      <td>basics of computer science declarative knowledge : factual statements imparative knowledge : how - to statements, expressed in algorithms - steps in an exact order, such as how to perform a computation. algorithm contains loops, telling the program to start over and repeat a process, termination code must be includedinfinite loop : missing termination code, program runs forever why are we talking about the germans i dont know what this has to do with anything fixed program : machine executes algorithms. stored program computer. operator prov stored program : instructions are treated just like the data - can change program at any time, program can produce data, program can produce program - computer is a program now memory ( stores information, one kind of memory ), cu ( control unit, tells, alu, input and outputcu tells ccu tells computer what to do al</td>
+      <td>6260226</td>
+      <td>1</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.600946</td>
+      <td>Toucan?s take advantage of their large bill by intimidating smaller birds</td>
+      <td>america ) 40 species toco toucan ( largest 25 ' ' ) aracar toucanet ( smallest 12 ' 4. 5oz ) short body rounded tail lifespan ( 18 years in capticity ) dont migrate ( dont fly well, hop between tree branches ) biiger toucans have bigger bills 4 toes first and fourth turn backwards ( helps grab branches to stand ) raising children ( tree holes ) natural tree holes by woodpeckers why live so small hole? sleep with their head turn backwards and pull their tail upwards 5 - 6 can fit in the ho ; e mom and dad take turns to sit on eggs but impatient ( leave their eggs uncovered ) eggs hatched 2 weeks and naked feathers fill in 4 weeks old 7 weeks flymother leave once kid can survive fly together family stick together playful birds, conspirous feather black color ( toco toucan ) keel billed ( colorful ) except bill feet area around eyes area around eyes are colorful because skin toucan colorful to survive ( blend in with fruits ) bill more than half the length of body quite light and hollow and honeyccarkeratin in bill catacolm hard sponge balance strength</td>
+      <td>6260215</td>
+      <td>2</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.594186</td>
+      <td>Inferential statistics tell you about the population.</td>
+      <td>statistics - collect and analyze data q about populations pop = people that makes up interested group ( entire collected objects ) ex : community college students not always possible to obtain populaiton sample - - subset of pop sampling for when you can ' t get entire population n population n sample ( smaller than pop ) ex 5000 pop and sample 50 good sample - - > look like pop ( tricky to accomplish ) two types of stats - descriptive and inferential descript = describes - - > how well company pays the employees ( highest, lowest, maximum, minimum, anything that describes the stats ) infer = predicts - - > tell us about data we don ' t have ( 10 weather stations - say stuff about places that don ' t have weather stations ) descriptive - graphing, describing, tells you something bout sample inferential tells you something about pop not sample ex average wt of people in major compared to campus collect data by random sampling - equally likely to be picked experiement vs direct observation are the two ways to collect data experiments - - > know how to design them ( research methods ) direct obs ervation 3 types of observational studies cross seciton - most common = m</td>
+      <td>6260216</td>
+      <td>2</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0.381163</td>
+      <td>Masers produce microwaves and radio waves</td>
+      <td>history of lasers : early 19th century with two discoveries made laser : visible light charles towne and arthur schalow - maser ex ) monochromatic light ex ) waves are mixed gordon gould - laser. lasers are powerful light beams, the solution to a problem flashlights are like ripples in a bathtub for example ex ) white light for flashlights ex ) huge waves in the sea ex ) waves are coherent</td>
+      <td>6260218</td>
+      <td>1</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.569090</td>
+      <td>Statistics involves collecting and analyzing data.</td>
+      <td>statistics - collect and analyze data q about populations pop = people that makes up interested group ( entire collected objects ) ex : community college students not always possible to obtain populaiton sample - - subset of pop sampling for when you can ' t get entire population n population n sample ( smaller than pop ) ex 5000 pop and sample 50 good sample - - > look like pop ( tricky to accomplish ) two types of stats - descriptive and inferential descript = describes - - > how well company pays the employees ( highest, lowest, maximum, minimum, anything that describes the stats ) infer = predicts - - > tell us about data we don ' t have ( 10 weather stations - say stuff about places that don ' t have weather stations ) descriptive - graphing, describing, tells you something bout sample inferential tells you something about pop not sample ex average wt of</td>
+      <td>6260216</td>
+      <td>1</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>0</td>
+      <td>1</td>
+      <td>0.563618</td>
+      <td>The weather stations are samples, and the weather in the entire city is a population.</td>
+      <td>statistics - collect and analyze data q about populations pop = people that makes up interested group ( entire collected objects ) ex : community college students not always possible to obtain populaiton sample - - subset of pop sampling for when you can ' t get entire population n population n sample ( smaller than pop ) ex 5000 pop and sample 50 good sample - - > look like pop ( tricky to accomplish ) two types of stats - descriptive and inferential descript = describes - - > how well company pays the employees ( highest, lowest, maximum, minimum, anything that describes the stats ) infer = predicts - - > tell us about data we don ' t have ( 10 weather stations - say stuff about places that don ' t have weather stations ) descriptive - graphing, describing, tells you something bout sample inferential tells you something about pop not sample ex average wt of people in major compared to campus collect data by random sampling - equally likely to be picked experiement vs direct observation are the two ways to collect data experiments - - > know how to design them ( research methods ) direct obs ervation 3 types of observational studies cross sec</td>
+      <td>6260216</td>
+      <td>1</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.477642</td>
+      <td>The James Bond movie Goldfinger (1964) introduced people to lasers</td>
+      <td>to stimulate atoms electrons are at level 1 absorption of electrons at level 2 spontaneous emission stimulated emission electromagnetic radiation electromagnetic raidation light amplification stimulated emission the smallest quantity of energy is quantum inject precise quantum of energy lasers create photons - electromagnetic radiation solid, liquid, gas, fiber types of lasers doping and high powered beams gas lasers - continuous beams and high power efficiency use organic dye can make lasers out of different colors fiber, liquid, charles towne goldfinger - james bond the laser uses - carbon dioxide lasers industrial cutting lasik surgery remove tumors sdi - laser as a weapon orbiting satellites use x - ray lasers pervasive uses</td>
+      <td>6260218</td>
+      <td>4</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0.376750</td>
+      <td>Alan Turing's machines were built for the Allies to decode German military messages during World War II.</td>
+      <td>basics of computer science declarative knowledge : factual statements imparative knowledge : how - to statements, expressed in algorithms - steps in an exact order, such as how to perform a computation. algorithm contains loops, telling the program to start over and repeat a process, termination code must be includedinfinite loop : missing termination code, program runs forever why are we talking about the germans i dont know what this has to do with anything fixed program : machine executes algorithms. stored program computer. operator prov stored program : instructions are treated just like the data - can change program at any time, program can produce data, program can produce program - computer is a program now memory ( stores information, one kind of memory ), cu ( control unit, tells, alu, input and outputcu tells ccu tells computer what to do alu : computations, logical operations. brain of the computer input and output devices : keyboard, mouse</td>
+      <td>6260226</td>
+      <td>1</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.417613</td>
+      <td>In Python, the command ?S-T-R? means ?string,? representing characters and letters.</td>
+      <td>program runs forever why are we talking about the germans i dont know what this has to do with anything fixed program : machine executes algorithms. stored program computer. operator prov stored program : instructions are treated just like the data - can change program at any time, program can produce data, program can produce program - computer is a program now memory ( stores information, one kind of memory ), cu ( control unit, tells, alu, input and outputcu tells ccu tells computer what to do alu : computations, logical operations. brain of the computer input and output devices : keyboard, mouse, screen transistors : inside the alu, can complete many operations transitors and binary system - 0 and 1, 0 off 1 on - get rid of anything without 0 and 1 - 00 0 01 1 10 2 11 3 100 4 101 5 110 6 - each number is a lightbulb on 1 off 0 - programming : syntax and semantics, commands programming languages : provide primitive commands, what commands are legal, how to combine commands java : char = characters or letters python : str = characters or letters syntax, static semantics</td>
+      <td>6260226</td>
+      <td>3</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0.336833</td>
+      <td>In 2014, the US Navy tested a Laser Weapon System in the Persian Gulf</td>
+      <td>lasers create photons - electromagnetic radiation solid, liquid, gas, fiber types of lasers doping and high powered beams gas lasers - continuous beams and high power efficiency use organic dye can make lasers out of different colors fiber, liquid, charles towne goldfinger - james bond the laser uses - carbon dioxide lasers industrial cutting lasik surgery remove tumors sdi - laser as a weapon orbiting satellites use x - ray lasers pervasive uses</td>
+      <td>6260218</td>
+      <td>4</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.552586</td>
+      <td>The person who collects data in a prospective study is usually the person who designed the study.</td>
+      <td>##s - - > tell us about data we don ' t have ( 10 weather stations - say stuff about places that don ' t have weather stations ) descriptive - graphing, describing, tells you something bout sample inferential tells you something about pop not sample ex average wt of people in major compared to campus collect data by random sampling - equally likely to be picked experiement vs direct observation are the two ways to collect data experiments - - > know how to design them ( research methods ) direct obs ervation 3 types of observational studies cross seciton - most common = m at given time and look at data ( ht of men and women samples - shows the time of ht at time collected data ) retrospective go back in time - ex : data already collected - not typically obtained by researcher prospective - go forward in time stop time - ba observation - observe and don ' t affect action key to it - - > collect data as observe can ' t show causation due to confoudning variables ( hidden variable that may not be collected ) can ' t collect all variables - - affect results ex - more smoking more likely get cancer</td>
+      <td>6260216</td>
+      <td>2</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>0</td>
+      <td>1</td>
+      <td>0.590060</td>
+      <td>Confounding variables, such as bad health habit, can cause both smoking behavior and lung cancer.</td>
+      <td>by random sampling - equally likely to be picked experiement vs direct observation are the two ways to collect data experiments - - > know how to design them ( research methods ) direct obs ervation 3 types of observational studies cross seciton - most common = m at given time and look at data ( ht of men and women samples - shows the time of ht at time collected data ) retrospective go back in time - ex : data already collected - not typically obtained by researcher prospective - go forward in time stop time - ba observation - observe and don ' t affect action key to it - - > collect data as observe can ' t show causation due to confoudning variables ( hidden variable that may not be collected ) can ' t collect all variables - - affect results ex - more smoking more likely get cancer - - - > smoking more likely to get cancer? is it bad heath habits? more firefighters more damage - - size of fire - need more firefighters when more fire. always have to worry about confounding variables experimental study you affect the action dealing with confounds - you control all other variables by</td>
+      <td>6260216</td>
+      <td>3</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.584007</td>
+      <td>Retrospective studies go back in time.</td>
+      <td>types of stats - descriptive and inferential descript = describes - - > how well company pays the employees ( highest, lowest, maximum, minimum, anything that describes the stats ) infer = predicts - - > tell us about data we don ' t have ( 10 weather stations - say stuff about places that don ' t have weather stations ) descriptive - graphing, describing, tells you something bout sample inferential tells you something about pop not sample ex average wt of people in major compared to campus collect data by random sampling - equally likely to be picked experiement vs direct observation are the two ways to collect data experiments - - > know how to design them ( research methods ) direct obs ervation 3 types of observational studies cross seciton - most common = m at given time and look at data ( ht of men and women samples - shows the time of ht at time collected data ) retrospective go back in time - ex : data already collected - not typically obtained by researcher prospective - go forward in time stop time - ba observation - observe and don ' t affect action key to it - - > collect data as observe can ' t show causation due to confo</td>
+      <td>6260216</td>
+      <td>2</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>0</td>
+      <td>0</td>
+      <td>0.336483</td>
+      <td>Ruby crystal absorbs energy from flash tube (absorption)</td>
+      <td>early 19th century with two discoveries made laser : visible light charles towne and arthur schalow - maser ex ) monochromatic light ex ) waves are mixed gordon gould - laser. lasers are powerful light beams, the solution to a problem flashlights are like ripples in a bathtub for example ex ) white light for flashlights ex ) huge waves in the sea ex ) waves are coherent laser characteristics - specificity - distance 0consist electrons make up lasers and it needs something to stimulate atoms electrons are at level 1 absorption of electrons at level 2 spontaneous emission stimulated emission electromagnetic radiation electromagnetic raidation light amplification stimulated emission the smallest quantity of energy is quantum inject precise quantum of energy</td>
+      <td>6260218</td>
+      <td>2</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.604956</td>
+      <td>Unlike most mother birds, toucans leave the nest together once toucanets can fly</td>
+      <td>tucano ( south america ) 40 species toco toucan ( largest 25 ' ' ) aracar toucanet ( smallest 12 ' 4. 5oz ) short body rounded tail lifespan ( 18 years in capticity ) dont migrate ( dont fly well, hop between tree branches ) biiger toucans have bigger bills 4 toes first and fourth turn backwards ( helps grab branches to stand ) raising children ( tree holes ) natural tree holes by woodpeckers why live so small hole? sleep with their head turn backwards and pull their tail upwards 5 - 6 can fit in the ho ; e mom and dad take turns to sit on eggs but impatient ( leave their eggs uncovered ) eggs hatched 2 weeks and naked feathers fill in 4 weeks old 7 weeks flymother leave once kid can survive fly together family stick together playful birds, conspirous feather black color ( toco toucan ) keel billed ( colorful ) except bill feet area around eyes area around eyes are colorful because skin toucan colorful to survive ( blend in with fruits )</td>
+      <td>6260215</td>
+      <td>1</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>16</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.565390</td>
+      <td>Descriptive statistics describes data, like a summary of data.</td>
+      <td>statistics - collect and analyze data q about populations pop = people that makes up interested group ( entire collected objects ) ex : community college students not always possible to obtain populaiton sample - - subset of pop sampling for when you can ' t get entire population n population n sample ( smaller than pop ) ex 5000 pop and sample 50 good sample - - > look like pop ( tricky to accomplish ) two types of stats - descriptive and inferential descript = describes - - > how well company pays the employees ( highest, lowest, maximum, minimum, anything that describes the stats ) infer = predicts - - > tell us about data we don ' t have ( 10 weather stations - say stuff about places that don ' t have weather stations ) descriptive - graphing, describing, tells you something bout sample inferential tells you something about pop not sample ex average wt of people in major compared to campus collect data by random sampling - equally likely to be picked experiement vs direct observation are the two ways to collect data experiments - - > know how to design them ( research methods ) direct obs ervation 3 types of observational studies cross seciton - most common =</td>
+      <td>6260216</td>
+      <td>1</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>17</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.584768</td>
+      <td>Stored program computers consist of three main parts: the control unit, memory, and the arithmetic logic unit (ALU).</td>
+      <td>basics of computer science declarative knowledge : factual statements imparative knowledge : how - to statements, expressed in algorithms - steps in an exact order, such as how to perform a computation. algorithm contains loops, telling the program to start over and repeat a process, termination code must be includedinfinite loop : missing termination code, program runs forever why are we talking about the germans i dont know what this has to do with anything fixed program : machine executes algorithms. stored program computer. operator prov stored program : instructions are treated just like the data - can change program at any time, program can produce data, program can produce program - computer is a program now memory ( stores information, one kind of memory ), cu ( control unit, tells, alu, input and outputcu tells ccu tells computer what to do alu : computations, logical operations. brain of the computer input and output devices : keyboard, mouse, screen transistors : inside the alu, can complete many operations transitors and binary system - 0 and 1, 0 off 1 on - get rid of anything without 0 and</td>
+      <td>6260226</td>
+      <td>2</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>18</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.424241</td>
+      <td>The WBCA restricted the imports of endangered bird species</td>
+      <td>- 6 can fit in the ho ; e mom and dad take turns to sit on eggs but impatient ( leave their eggs uncovered ) eggs hatched 2 weeks and naked feathers fill in 4 weeks old 7 weeks flymother leave once kid can survive fly together family stick together playful birds, conspirous feather black color ( toco toucan ) keel billed ( colorful ) except bill feet area around eyes area around eyes are colorful because skin toucan colorful to survive ( blend in with fruits ) bill more than half the length of body quite light and hollow and honeyccarkeratin in bill catacolm hard sponge balance strength ratio edges to eat meat long gray narrow tounge forging ( intimidate small birds ) and communicating long bills provide reach throw food back at the throat saw like edges to tear fruit long disgestion ( 75 min ) cant eat while digesting insects offer protein fruit as gift hot send more heat to the bill export to central america, deforestation decrease population small cages, dog food, mice 50s - 80s large demand of toucan in us cost of fresh fruits special pellets ( low iron ) toys last a few months much larger space fewer</td>
+      <td>6260215</td>
+      <td>3</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>19</th>
+      <td>1</td>
+      <td>1</td>
+      <td>0.522536</td>
+      <td>Computers using the binary system interpret 0 as off and 1 as on.</td>
+      <td>order, such as how to perform a computation. algorithm contains loops, telling the program to start over and repeat a process, termination code must be includedinfinite loop : missing termination code, program runs forever why are we talking about the germans i dont know what this has to do with anything fixed program : machine executes algorithms. stored program computer. operator prov stored program : instructions are treated just like the data - can change program at any time, program can produce data, program can produce program - computer is a program now memory ( stores information, one kind of memory ), cu ( control unit, tells, alu, input and outputcu tells ccu tells computer what to do alu : computations, logical operations. brain of the computer input and output devices : keyboard, mouse, screen transistors : inside the alu, can complete many operations transitors and binary system - 0 and 1, 0 off 1 on - get rid of anything without 0 and 1 - 00 0 01 1 10 2 11 3 100 4 101 5 110 6 - each number is a lightbulb on 1 off 0 - programming : syntax and semantics, commands programming languages : provide</td>
+      <td>6260226</td>
+      <td>2</td>
+      <td>True</td>
+    </tr>
+  </tbody>
+</table></body></html>
