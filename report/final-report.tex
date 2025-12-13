@@ -15,45 +15,85 @@
 \title{COM S 5790 Final Project: Evaluating Note-Taking Quality Using Rule-Based, BERT, and LLM Models}
 
 \author{
-  Benjamin Jia Zhiang Kam \qquad Second Author \qquad Jesus Soto Gonzalez\\[0.5em]
+  Benjamin Jia Zhiang Kam \qquad Mason Inman \qquad Jesus Soto Gonzalez\\[0.5em]
   Department of Computer Science \\
   Iowa State University \\[0.5em]
-  \texttt{bkam@iastate.edu, second@iastate.edu, jhsoto@iastate.edu}
+  \texttt{bkam@iastate.edu, mjinman@iastate.edu, jhsoto@iastate.edu}
 }
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-This project studies how well different NLP methods can identify whether students capture important ideas while taking notes in 
-several subjects. We use lecturer specified ideas and student-written notes to frame this as a binary classification task. 
-Our work compares three approaches: a simple rule-based method, a BERT classifier trained on the available annotations, and a 
-large language model evaluated with zero-shot and one-shot prompting.
+% Automatically evaluating whether student notes capture key ideas from a lecture can support learning research and instructor feedback. In this work, the task is framed as a binary classification problem. With lecturer-defined IdeaUnits and student note segments, the task is to determine whether an IdeaUnit is present in a segment.
+
+% We compare three approaches based on different NLP design principles: a rule-based model that measures lexical overlap, a BERT sequence-pair classifier fine-tuned with class-weighted supervision, and a large language model prompted with zero-shot and one-shot templates. Our findings show clear trade-offs. The rule-based model performs well when ideas appear with similar wording. BERT improves semantic recall even with very limited supervision. The LLM offers flexible reasoning, but remains sensitive to the quality of the prompt.
+
+We frame IdeaUnit coverage in student notes as binary classification and compare a lexical rule-based baseline, a BERT sequence-pair classifier with a novel temporal alignment that extracts IdeaUnit-specific evidence to reduce truncation bias, and a prompted LLaMA~3 model. The rule-based method performs best overall (F1 0.75), BERT attains the highest recall with strong ranking quality (F1 0.69), and the LLM lags despite one-shot prompting (F1 0.54), highlighting that the task rewards lexical overlap while still benefiting from semantic modeling and task structure.
+
 \end{abstract}
 
 
 \section{Introduction}
-Note-taking is an important part of learning, but students vary in how well they record the main ideas from a lecture. Being able 
-to automatically check whether a note contains a specific key idea could help instructors understand what students are picking up 
-and could support research on study habits.
+Note-taking is a central learning strategy because it helps students identify, organize, and retain the main ideas presented in a lecture. However, students vary widely in what they capture in their notes, making it difficult for instructors to assess what information is being understood or overlooked. An automatic method to detect whether student-written notes contain key ideas from a lecture could support learning research and provide useful feedback to educators.
 
-In this project, we work with a dataset where each lecture has a set of important ideas, called IdeaUnits, and each student provides 
-notes divided into segments. The goal is to determine if a given IdeaUnit appears in the matching note segment. Because there is 
-only one labeled example per topic, the task becomes a low-resource classification problem with noisy text written by students.
+The data set we study contains, for each lecture topic, a set of instructor-defined IdeaUnits and a set of student notes divided into segments. The task is to determine whether a specific IdeaUnit appears in a corresponding segment of a student's notes. This setting is challenging because each topic includes only one labeled example, which creates a highly limited and noisy supervision signal.
 
-To explore different ways of handling this challenge, we evaluate three types of models: a rule-based approach, a BERT classifier 
-trained on the available labels, and a large language model that relies on prompting. Our goal is to 
-understand the strengths and weaknesses of each approach in this limited-supervision setting.
+Our work evaluates how different NLP approaches behave under this low-resource condition. The goal is to understand what types of modeling strategies are most effective in identifying whether a student has captured a key idea. In the following sections, we formally define the task and then describe three modeling approaches that reflect different assumptions about how idea coverage can be detected.
 
 
-\section{Related Work}
+% \section{Related Work}
+% we can leave this out to save space if needed
+
+\section{Task Definition}
+
+Given a lecture topic $t$, we are provided with a set of instructor-defined \texttt{IdeaUnits}
+$U_t = \{u_1, \ldots, u_m\}$ and a set of student note segments 
+$S_t = \{s_1, \ldots, s_n\}$. 
+Each training instance consists of a pair $(u, s)$ with $u \in U_t$ and $s \in S_t$, 
+along with a binary label $y \in \{0,1\}$ indicating whether $s$ expresses the idea described by $u$.
+
+Our goal is to learn a function 
+\[
+f_\theta(u, s) \rightarrow y,
+\]
+where $\theta$ denotes model parameters or decision rules.  
+For probabilistic models, we estimate
+\[
+p_\theta(y = 1 \mid u, s)
+\]
+and predict
+\[
+\hat{y} = \arg\max_{y \in \{0,1\}} p_\theta(y \mid u, s).
+\]
+
+In rule-based approaches, a similarity score between the texts is computed as
+\[
+\mathrm{Score}(u, s),
+\]
+and the prediction is given by
+\[
+f(u, s) =
+\begin{cases}
+1 & \text{if } \mathrm{Score}(u, s) \ge \tau,\\
+0 & \text{otherwise}.
+\end{cases}
+\]
+
+Because our learning setup uses only one labeled example per topic, the supervision signal is extremely limited, and the model must generalize from sparse and noisy student-written text.
 
 \section{Methodology}
-All methods in this project address the same prediction task: given an IdeaUnit defined by the lecturer and the corresponding 
-segment of a student's notes, the model must decide whether the idea is present. Each team member implemented a different type 
-of model to study how various NLP approaches handle this low-resource setting. Below we describe each model in detail.
 
-\subsection{Rule-Based Model}
+We frame the task as a binary decision function
+\[
+f_\theta(u,s) \rightarrow y,
+\]
+where $u$ is an instructor-defined IdeaUnit, $s$ is a student note segment, and
+$y\in\{0,1\}$ indicates whether the idea is present.  
+We compare three modeling approaches that embody different assumptions about how idea coverage can be detected in short, noisy student notes. The rule-based model relies on lexical similarity, the BERT classifier learns a parametric mapping from a single labeled example per topic, and the LLM model uses instruction-following with zero-shot and one-shot prompting.  
+The subsections below summarize the design principles of each approach.
+
+\subsection{Rule-Based Model Methodology}
 For the rule based model approach, we decided to combine 5 metrics to evaluate the rule based prediction. These metrics are fuzzing matching, using RapidFuzz's token\_sort\_ratio, jaccard similarity, semantic similarity, using spaCy's embeddings, cosine similarity and numerical matching. The implementation of the model is split into three separate sections: \texttt{pre\_processing.ipynb}, \texttt{main.ipynb} and \texttt{threshold\_testing.ipynb}.\\
 
 \paragraph{Preprocessing (\texttt{pre\_processing.ipynb}).}
@@ -65,47 +105,102 @@ This file loads \texttt{train\_cleaned.csv} and for computational purposes, we o
 \paragraph{Execution on Train dataset (\texttt{main.ipynb}).}
 This file uses the optimal thresholds provided by \texttt{threshold\_testing.ipynb} and applies them on \texttt{train\_cleaned.csv}. We calculate the \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match} and assign them weights to combine the metrics to give a weighted score. The predictions are saved in the 'Predicted Label' column of a separate CSV file.
 
-\subsection{BERT-Based Classifier}
+\subsection{BERT-Based Classifier with Temporal Alignment Methodology}
+We fine-tune \texttt{bert-base-uncased} \citep{devlin2019bert} as a binary sequence-pair classifier. For each example, we encode an instructor IdeaUnit $u$ and a note span $x$ as
+\texttt{[CLS] $u$ [SEP] $x$ [SEP]} and use the final \texttt{[CLS]} representation with a linear head to estimate $p_\theta(y=1 \mid u,x)$.
 
-\subsection{LLM-Based Model}
-For the large language model approach, we used Meta's LLaMA 3 8B Instruct model \citep{llama3}. The implementation is organized 
-into four main components: \texttt{preprocessing.py}, \texttt{prompts.py}, \texttt{llm\_note\_classifier.py}, and 
-\texttt{evaluate\_llm.py}. Together, these scripts form a simple pipeline that goes from raw CSV files to final predictions 
-and evaluation.
+A standard BERT pair model must truncate long notes to \texttt{max\_length}, which disproportionately removes evidence from later parts of a lecture. This creates a systematic failure mode: IdeaUnits discussed near the end of a lecture may be unobservable to the classifier if only the first $\texttt{max\_length}$ tokens of the notes are used. Our temporal alignment mechanism addresses this by selecting an IdeaUnit-specific span from the full note stream before truncation.
 
-\paragraph{Preprocessing (\texttt{preprocessing.py}).}
-This file loads \texttt{Notes.csv}, \texttt{train.csv}, and \texttt{test.csv} and aligns them into a usable format. The key step is 
-the \texttt{add\_segment\_text} function, which merges each (Topic, ID, Segment) pair with the corresponding note segment 
-like \texttt{Segment1\_Notes} and stores it in a single \texttt{segment\_text} field. This gives the LLM a direct pairing of an 
-IdeaUnit and the matching student note segment.
+\paragraph{Note stream representation.}
+For each student and topic, we form a single note stream by concatenating all available note segments:
+\[
+N = s_1 \Vert s_2 \Vert s_3 \Vert s_4.
+\]
+We tokenize $N$ into $L$ subword tokens $(w_0,\dots,w_{L-1})$ (without special tokens), treating token position as a proxy for time within the lecture.
 
-\paragraph{Prompt construction (\texttt{prompts.py}).}
-This module defines two prompt templates, one for zero-shot and one for one-shot inference, following the in-context learning setup introduced in prior work \citep{brown2020language}. The zero-shot template includes only the task instructions, the IdeaUnit, and the student's note. The one-shot template adds a labeled example from the same topic, which contains an IdeaUnit, a note, and its correct label, so the model can see a simple demonstration of the task before answering.
+\paragraph{Temporal token alignment.}
+Within a topic $t$, let $U_t=(u_0,\dots,u_{K-1})$ be the ordered list of distinct IdeaUnits, where $K=|U_t|$. We approximate this lecture order by the first appearance of each IdeaUnit in the dataset for that topic.
+For an IdeaUnit $u_j$, we assign a normalized lecture interval
+\[
+I_j=\left[\frac{j}{K},\frac{j+1}{K}\right),
+\]
+and expand it by a margin $m$ to obtain
+\[
+I'_j=\left[\max\!\left(0,\frac{j}{K}-m\right),\ \min\!\left(1,\frac{j+1}{K}+m\right)\right].
+\]
+We map $I'_j$ to token indices in the note stream:
+\[
+a=\left\lfloor \alpha L \right\rfloor,\quad b=\left\lfloor \beta L \right\rfloor,
+\]
+where $[\alpha,\beta]=I'_j$, and extract the aligned evidence span
+\[
+x=\mathrm{decode}(w_a,\dots,w_{b-1}).
+\]
+Finally, we cap the span length so that the combined sequence \texttt{[CLS] $u$ [SEP] $x$ [SEP]} fits within \texttt{max\_length}. Unlike naive truncation, this procedure ensures that IdeaUnits assigned to late lecture intervals are paired with note evidence from late portions of the notes, rather than being systematically dropped.
 
-\paragraph{Model Execution (\texttt{llm\_note\_classifier.py}).}
-This script loads LLaMA 3 8B Instruct through the Hugging Face \texttt{transformers} library and runs the actual classification. 
-For each (IdeaUnit, \texttt{segment\_text}) pair, it builds a prompt using the functions in \texttt{prompts.py} and feeds it to the 
-model. The \texttt{call\_llm} function then compares the logits for the next token being ``YES'' or ``NO'' and selects the 
-label with the higher score as the prediction.
+If an IdeaUnit is missing from the ordering map, we fall back to a coarse alignment based on the segment index (1--4), centering the interval at $(s-0.5)/4$.
 
-For the one-shot condition, we use \texttt{select\_one\_shot\_examples} to choose a single example per topic. This function computes 
-a simple lexical overlap score between each IdeaUnit and its note and selects the positive example with the highest overlap. Using 
-token-level lexical similarity in this way \citep{manning2008foundations} helps us choose cleaner and more representative examples 
-for the prompts.
+\paragraph{Training protocol and thresholding.}
+By default, we perform a random 80/20 split of \texttt{train.csv} into train/validation; optionally, we evaluate a one-shot-per-topic regime by selecting exactly one labeled example per (\textit{Experiment}, \textit{Topic}) group. After fine-tuning, we tune a decision threshold $\tau$ on the validation set to maximize F1 and predict
+\[
+\hat{y}_{\text{bert}} =
+\begin{cases}
+1 & \text{if } p_\theta(y=1\mid u,x)\ge\tau,\\
+0 & \text{otherwise}.
+\end{cases}
+\]
 
-\paragraph{In-depth LLM Evaluation (\texttt{evaluate\_llm.py}).}
-Finally, \texttt{evaluate\_llm.py} loads the saved predictions, compares them to the correct labels, and reports accuracy, 
-precision, recall, F1 score, and a full classification report using \texttt{scikit-learn}. These metrics are used in the Results 
-and Discussion section to compare zero-shot, one-shot, and the improved one-shot setups.
+
+\subsection{LLM-Based Model Methodology}
+
+We treat idea coverage as a prompt-based binary classification task using the instruction-tuned LLaMA~3 8B model \citep{llama3}. For each IdeaUnit $u$ and note segment $s$, the model receives a natural language prompt describing the task and must decide whether the idea is expressed.
+
+\paragraph{Next-token classification.}
+Instead of generating free-form text, we compare the model’s next-token logits for the verbalizers \texttt{" YES"} and \texttt{" NO"} \citep{brown2020language}. The predicted label is
+\[
+\hat{y} = \arg\max_{y \in \{\texttt{"YES"}, \texttt{"NO"}\}}
+    \log p_{\theta}(y \mid P(u,s)),
+\]
+which avoids output-parsing errors and yields a deterministic classifier without fine-tuning.
+
+\paragraph{Prompt design.}
+Student notes contain misspellings, abbreviations, and partial phrases. The zero-shot prompt therefore instructs the model to accept paraphrases and clear abbreviations, but to reject vague keyword matches or incomplete hints. This is intended to push the model toward semantic rather than lexical matching.
+
+\paragraph{One-shot prompting.}
+In the one-shot setting, the prompt additionally includes a single labeled example from the same lecture topic. To select this example, we compute a simple lexical-overlap score between each training pair $(u,s)$ \citep{manning2008foundations} and choose the positive example with the highest alignment. This provides the model with a clean demonstration of what counts as full idea coverage in that topic.
+
+\paragraph{Assumptions.}
+This approach is based on three main assumptions. First, an instruction-tuned LLM can evaluate semantics and match key lecture ideas and noisy student notes. Second, the model's next-token probabilities can be used to estimate $p(y=1\mid u,s)$. Third, a single carefully chosen example in the prompt can calibrate the model in a low-resource, per-topic setting.
+
+Overall, the LLM method relies entirely on prompting and requires no gradient-based training, offering a flexible contrast to the rule-based and BERT-based approaches.
 
 
 \section{Experiments}
+\subsection{Dataset}
+The dataset contains instructor-defined IdeaUnits and student note segments across multiple lecture topics. For each topic, instructors provide a set of short conceptual statements (\textit{IdeaUnits}), and each student contributes up to four segmented notes. A labeled training instance pairs one IdeaUnit with the corresponding student note segment for that topic, and the label indicates whether the idea is expressed in the note.
 
-\subsection{Rule-Based Model}
+The \texttt{Notes.csv} file contains 1,643 student--topic entries, each with up to four note segments. The training split provides 255 labeled IdeaUnit--segment pairs (124 positive and 131 negative), with at most one labeled example per topic in our one-shot setting. The test split contains 9,945 evaluation pairs, which remain unlabeled during training. The data is moderately imbalanced, and the student-written notes vary widely in length and quality, making the classification task challenging.
 
+\subsection{Evaluation Metrics}
+
+We evaluate all models using standard metrics for binary classification: accuracy, precision, recall, and F1-score. Accuracy measures overall correctness, while precision and recall capture performance on the positive class, which is important given the moderate class imbalance in the dataset. The F1-score summarizes precision and recall into a single harmonic mean.
+
+Formally, let $TP$, $FP$, and $FN$ denote true positives, false positives, and false negatives. Then
+\[
+\text{Precision} = \frac{TP}{TP + FP}, \qquad
+\text{Recall} = \frac{TP}{TP + FN},
+\]
+\[
+\text{F1} = \frac{2 \cdot \text{Precision} \cdot \text{Recall}}
+{\text{Precision} + \text{Recall}}.
+\]
+
+\subsection{Experimental Setup}
+
+\paragraph{Rule-Based Model Experiments}
 For the rule based model, we began with 5 metrics for scoring - \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match}. This approach worked fairly well as the scoring mainly focuses on observing for overlapping words/tokens between Response and CorrectAnswer. As these are short answer questions, the scoring tends to be polarized easily, allowing a decisive prediction to be made. 
 
-For the second experiment, we decided to test the effects of removing \texttt{num\_match} as we realized that not all questions were numerical and due to \texttt{num\_match}'s weight, it would not be impactful. This led to improved results, which we believe was due to the increased weight on \texttt{fuzzy\_ratio}, which prioritized overlapping/similar words instead of meaning.
+For the second experiment, we decided to test the effects of removing \texttt{num\_match} as we realized that not all questions were numerical and due to \texttt{num\_match}'s weight, it would not be impactful. This led to improved results, which we believe wBERas due to the increased weight on \texttt{fuzzy\_ratio}, which prioritized overlapping/similar words instead of meaning.
 
 We realized that spaCy's \texttt{semantic\_similarity} was based on a machine learning model, and this means that the previous rule based models were not true rule based models. As we want the final rule based model to be completely rule based, we conducted our third experiment, where scoring left out \texttt{semantic}. The results showed that our first 'true' rule based model was performing better than the hydrid model with \texttt{semantic} as accuracy, precision and recall improved. 
 
@@ -113,70 +208,80 @@ Following the same intuition we had in experiment two, we conducted our fourth e
 
 Observing the results of the past experiments, we realized how as the weight of \texttt{fuzzy\_ratio} increased, the results improved. We were interested about the effect on using \texttt{fuzzy\_ratio} as the sole metric for scoring, which we carried out in our fifth and final experiment. The results of the experiment matched our hypothesis as it surpassed the past experiments in accuracy, recall and F1 score. The other metrics were adding noise as their rewarding methods are not aligned with the nature of our dataset as \texttt{jaccard} was too harsh on subtle differences and \texttt{cosine} was struggling with insufficient tokens due to the short text. We concluded that short-answer questions in our dataset reward surface-level character similarity more than semantic structure or contextual meaning. As \texttt{fuzzy\_ratio} does this well without being too harsh, it produces the best result when used alone for this dataset.
 
-\subsection{BERT-Based Classifier}
+\paragraph{BERT-Based Classifier Experiments}
 
-\subsection{LLM-Based Model}
-For the LLM experiments, we evaluated the model on both the small labeled training split and the full labeled test split to 
-understand how it behaves on different amounts of data.
+We fine-tune \texttt{bert-base-uncased} as a sequence-pair classifier on temporally aligned note chunks (alignment margin $m=0.3$). By default we use a seeded random 80/20 train/validation split of \texttt{train.csv} (batch size 8, max length 256, learning rate $2\times10^{-5}$, 4 epochs). We tune a fixed probability threshold $\tau$ on the validation split to maximize F1 and then apply the trained model and $\tau$ to generate predictions for \texttt{test.csv} pairs constructed using \texttt{Notes.csv}.
+We report accuracy, precision, recall, F1, ROC-AUC, and PR-AUC. ROC-AUC and PR-AUC not reported for rule and LLM based models, used for analysis of BERT model performance.
 
-Early tests used free-form generation, where the model was asked to produce “YES’’ or “NO’’ directly. This approach did not 
-work well. The model often generated full sentences such as “the note does not cover this idea,” and the parser mapped these 
-outputs to “NO.” Because of this, the model predicted only the negative class and never produced a single positive prediction, 
-so the initial results were not meaningful.
-
-To address this problem, we switched to a probability-based decision method. Instead of generating text, we ran the full prompt 
-through the model and checked which of the two tokens, “YES’’ or “NO,’’ the model considered more likely to appear next. We 
-selected the label with the higher probability. This approach follows common practices in prompt-based classification 
-\citep{brown2020language}, and it removed parsing issues, made the output deterministic, and allowed the model to correctly 
-predict both classes.
-
-In the one-shot setup, we first used the default example provided for each topic. After that, we tested an improved example 
-selection method. For each topic, we calculated a simple lexical overlap score between the IdeaUnit and the student’s note and 
-selected the positive example with the highest overlap. Using token-level lexical similarity in this way follows standard 
-heuristics in text matching \citep{manning2008foundations} and helped choose examples that were clearer and more directly 
-related to the idea being tested.
+\paragraph{LLM Setup.}
+The LLM experiments use LLaMA~3 8B Instruct in a prompt-based classification setting without fine-tuning. Each example is converted into either a zero-shot or one-shot prompt. The prediction is obtained from the model’s next-token logits for the verbalizers \texttt{"YES"} and \texttt{"NO"}. For one-shot prompting, the in-context example for each topic is selected from the training set by maximizing a lexical-overlap score between the IdeaUnit and its corresponding note segment. All prompts are truncated to a maximum length of 1024 tokens.
 
 \section{Results and Discussion}
 
-\subsection{Rule-Based Model}
+\subsection{Main Results}
 
-For Experiment 1, the execution of the Train split achieved an accuracy of 69.56\% and the execution of the Test split achieved an accuracy of 76.95. These results are satisfactory as although the model rarely makes false positives, it misses nearly half of the true positives.
+\begin{table}[h!]
+\centering
+\small
+\begin{tabularx}{\linewidth}{l c c c c}
+\hline
+\textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
+\hline
+Rule-Based & \textbf{0.81} & \textbf{0.93} & 0.60 & \textbf{0.75} \\
+\hline
+BERT-Based  & 0.72 & 0.72 & \textbf{0.66} & 0.69 \\
+\hline
+LLM-Based & 0.65 & 0.51 & 0.58 & 0.54 \\
+\hline
+\end{tabularx}
+\caption{Quantitative results of Rule, BERT, and LLM based models.}
+\label{tab:main_results}
+\end{table}
 
-For Experiment 2, both the accuracy results of the Train and Test splits improved. Accuracy of Train split, 71.02\%, and accuracy of Test split, 78.30\%. Although we are achieving a better score of accuracy, the recall is still lagging behind.
+\subsection{Analysis of Results}
 
-For Experiment 3, the removal of \texttt{semantic} led to an even greater weightage on \texttt{fuzzy\_ratio}, which improved the accuracy, precision and recall. We managed to lower our number of false positives, but we are still losing a large section of true positives.
+% The LLM performs the weakest of the three methods (accuracy 0.65, F1 0.54). 
+% Zero-shot prompting overpredicts positives, and one-shot prompting reduces this tendency but does not match the other models. 
+% Although the prompts explicitly account for misspellings, paraphrases, and incomplete phrasing, the short and noisy note segments still limit how much reliable semantic signal the model can extract.
 
-For Experiment 4, we achieved our best accuracy score with multiple scoring metrics as our accuracy was 78.32\%, just 0.02\% better than the next best accuracy score. However, our recall remained approximately the same.
+The rule-based model attains very high precision (0.93), indicating that many positive cases can be detected via strong lexical overlap between IdeaUnits and student notes; however, recall is lower (0.60) because paraphrases and fragmented mentions are missed. In contrast, BERT increases recall (0.66) with comparable precision (0.72), consistent with improved semantic matching. Our temporal alignment further supports this by extracting an IdeaUnit-specific evidence span from the full note stream, reducing the truncation bias that would otherwise drop late-lecture content under a fixed 256-token limit. The LLM underperforms (precision 0.51, F1 0.54) because predictions depend on prompt interpretation, which is brittle for short, noisy note segments; adding a topic-specific example (one-shot) improves calibration relative to zero-shot but remains weaker than supervised adaptation. Although the prompts explicitly account for misspellings, paraphrases, and incomplete phrasing, the short and noisy note segments still limit how much reliable semantic signal the model can extract.
 
-For our last experiment, we solely used \texttt{fuzzy\_ratio}. The results of this experiment recorded the best accuracy at 80.05\% and recall at 63\%, a 6\% increase from previous recall scores. We believe this is our best model as although the ability to prevent false positives declined (precision dropped from 0.98 to 0.93), the model improved its ability to prevent misprediction of true positives (recall increased from 56\% to 63\%).
 
-\subsection{BERT-Based Classifier}
+\subsection{Comparative Discussion}
 
-\subsection{LLM-Based Model}
-After replacing free-form generation with next-token logit scoring, the LLM began predicting both positive and negative labels 
-correctly, which made the evaluation meaningful.
+Overall, the results suggest this dataset strongly rewards surface-form similarity, explaining why a lexical rule-based baseline can outperform learned models on F1. By learning more complex features in the embedded space, we see an overall drop in performance at correctly classifiying IdeaUnits. At the same time, the gap in recall highlights that semantic generalization matters for a subset of examples, where BERT is more effective. The LLM’s weaker performance indicates that prompt-only reasoning is not robust enough for short, incomplete notes in this low-resource setting, even when augmented with a single in-topic demonstration.
 
-On the small training split, zero-shot prompting reached 59.6\% accuracy, slightly higher than the original one-shot setup at 
-58.8\%. Zero-shot also showed higher precision, while one-shot showed higher recall. Because the one-shot example came from a 
-single student's notes, it sometimes added noise rather than helping the model on this small dataset.
+The LLM underperforms because it cannot rely on strong lexical cues like the rule-based model and does not benefit from supervised adaptation like BERT. Its predictions depend entirely on prompt interpretation, which remains difficult for brief or incomplete notes despite the use of noise-aware prompting. One-shot prompting improves calibration by providing an in-topic example, but this is not sufficient to overcome the structural limitations of the data.
 
-On the full test split, zero-shot reached 63.9\% accuracy, and one-shot improved this to 64.7\%. Even though the gain was small, 
-it showed that providing one example helped the model generalize better across a much larger and more varied set of notes.
+% \subsection{Rule-Based Model Results}
+% For Experiment 1, the execution of the Train split achieved an accuracy of 69.56\% and the execution of the Test split achieved an accuracy of 76.95. These results are satisfactory as although the model rarely makes false positives, it misses nearly half of the true positives.
 
-The best performance came from the improved one-shot method that selected the positive example with the highest lexical overlap 
-between the IdeaUnit and the student note. This pushed test accuracy to 67.1\% and boosted precision, suggesting that clearer 
-and more relevant demonstrations make the prompt more effective.
+% For Experiment 2, both the accuracy results of the Train and Test splits improved. Accuracy of Train split, 71.02\%, and accuracy of Test split, 78.30\%. Although we are achieving a better score of accuracy, the recall is still lagging behind.
 
-Overall, the LLM performed well above the simple baseline which reaches about 51\% accuracy with zero recall. These results show 
-that the model was able to capture meaningful connections between IdeaUnits and student-written 
-notes, and that prompt design played an important role in its performance.
+% For Experiment 3, the removal of \texttt{semantic} led to an even greater weightage on \texttt{fuzzy\_ratio}, which improved the accuracy, precision and recall. We managed to lower our number of false positives, but we are still losing a large section of true positives.
 
-A summary of all LLM results is provided in Appendix Table~\ref{tab:llm_results}.
+% For Experiment 4, we achieved our best accuracy score with multiple scoring metrics as our accuracy was 78.32\%, just 0.02\% better than the next best accuracy score. However, our recall remained approximately the same.
+
+% For our last experiment, we solely used \texttt{fuzzy\_ratio}. The results of this experiment recorded the best accuracy at 80.05\% and recall at 63\%, a 6\% increase from previous recall scores. We believe this is our best model as although the ability to prevent false positives declined (precision dropped from 0.98 to 0.93), the model improved its ability to prevent misprediction of true positives (recall increased from 56\% to 63\%).
+
+% \subsection{BERT-Based Classifier Results}
+% On the held-out evaluation split, our temporally aligned BERT classifier achieves
+% 0.72 accuracy, 0.72 precision, 0.66 recall, and 0.69 F1. In addition to these
+% thresholded metrics, the model attains ROC-AUC 0.79 and PR-AUC 0.74, indicating
+% good separability and strong ranking quality across decision thresholds. Metrics
+% are computed with \texttt{scikit-learn} \citep{pedregosa2011scikit}.
+
+% The precision-recall balance suggests the model captures paraphrased or
+% non-identical mentions better than lexical overlap alone, while still producing
+% moderate false positives. Temporal alignment further mitigates truncation effects
+% by extracting IdeaUnit-specific evidence from the full note stream, preventing
+% late-lecture content from being systematically dropped under a fixed 256-token
+% input limit.
 
 \section{Conclusion}
-
-
+We studied automatic detection of IdeaUnit coverage in student notes under a low-resource setting with short, noisy text. A lexical rule-based baseline achieved the strongest overall performance, indicating that this dataset often rewards surface-form overlap between instructor phrasing and student notes. Our BERT sequence-pair classifier with temporal token alignment improved semantic coverage detection and achieved the highest recall. The prompted LLM approach was the weakest overall: one-shot prompting improved calibration relative to zero-shot, but prompt-only inference remained brittle on brief, incomplete note segments. Overall, the results suggest that effective note-quality assessment benefits from combining dataset-matched lexical cues with semantic generalization, and that incorporating task structure (lecture order) can mitigate context-length limitations.
 \section{Limitations}
+First, the labeled data are small and noisy, and our validation split is limited, which can introduce variance in both training outcomes and threshold selection. Second, our temporal alignment assumes that note-taking follows lecture order; when students reorder ideas or omit transitions, the aligned span may miss relevant evidence, or "lecture recaps" at the end. Third, approximating IdeaUnit order from dataset appearance may not perfectly match true lecture order and can affect alignment quality. Fourth, all methods treat the task as independent binary decisions per (IdeaUnit, segment) pair and do not model dependencies across IdeaUnits or segments (e.g., repeated mentions or cross-segment aggregation). Finally, the LLM results are sensitive to prompt design and example selection strategy, and stronger performance may require more extensive prompt tuning or lightweight adaptation beyond the scope of this project.
 
 
 \appendix
@@ -187,71 +292,20 @@ A summary of all LLM results is provided in Appendix Table~\ref{tab:llm_results}
 \begin{table}[h!]
 \centering
 \small
-\begin{tabularx}{\linewidth}{l c c c c}
+\begin{tabularx}{\linewidth}{l c c c c c}
 \hline
-\textbf{Model} & \textbf{Split} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} \\
+\textbf{Setting} & \textbf{Split} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
 \hline
-Zero-shot & Train & 0.5961 & 0.6235 & 0.4274 \\
-Zero-shot & Test  & 0.6392 & 0.5905 & 0.5000 \\
+Zero-shot & Train & 0.51 & 0.50 & 0.93 & 0.65 \\
+One-shot  & Train & 0.56 & 0.56 & 0.48 & 0.51 \\
 \hline
-One-shot  & Train & 0.5882 & 0.5785 & 0.5645 \\
-One-shot  & Test  & 0.6467 & 0.5101 & 0.5628 \\
-\hline
-One-shot (lex) & Train & 0.6235 & 0.6944 & 0.4032 \\
-One-shot (lex) & Test  & 0.6713 & 0.5462 & 0.5316 \\
+Zero-shot & Test  & 0.40 & 0.37 & 0.96 & 0.54 \\
+One-shot  & Test  & 0.65 & 0.51 & 0.58 & 0.54 \\
 \hline
 \end{tabularx}
-\caption{LLM-based classification results for zero-shot, one-shot, and improved one-shot prompting setups.}
-\label{tab:llm_results}
+\caption{LLM-based classification results for zero-shot and one-shot prompting on the train and test splits.}
+\label{tab:llm_appendix}
 \end{table}
-
-\section{Rule Based Results}
-
-\begin{table}[h!]
-    \centering
-    \small
-    \begin{tabularx}{\linewidth}{l c c}
-    \hline
-    \textbf{Experiment} & \textbf{Metrics} \\
-    \hline
-         1 & All 5 metrics: fuzzy\_ratio, jaccard, \\&semantic, cosine, num\_match \\
-         2 & Without num\_match \\
-         3 & Without semantic \\
-         4 & Without num\_match \& semantic \\
-         5 & Only fuzzy\_ratio \\
-    \hline
-    \end{tabularx}
-    \caption{Legends for metrics used in the experiments conducted}
-    \label{tab:placeholder}
-\end{table}
-
-\begin{table}[h!]
-    \centering
-    \small
-    \begin{tabularx}{\linewidth}{l c c c c c}
-    \hline
-    \textbf{Experiment} & \textbf{Split} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} \\
-    \hline
-         1 & Train & 0.6956 & 0.97 & 0.49  \\
-         1 & Test & 0.7695 & 0.97 & 0.52 \\
-    \hline
-         2 & Train & 0.7102 & 0.96 & 0.52 \\
-         2 & Test & 0.7830 & 0.96 & 0.56 \\
-    \hline
-         3 & Train & 0.6938 & 0.98 & 0.48 \\
-         3 & Test & 0.7734 & 0.98 & 0.53 \\
-    \hline
-         4 & Train & 0.7009 & 0.97 & 0.50 \\
-         4 & Test & 0.7832 & 0.97 & 0.55 \\
-    \hline
-        5 & Train & 0.7387 & 0.93 & 0.60 \\
-        5 & Test & 0.8055 & 0.93 & 0.63 \\
-    \hline
-    \end{tabularx}
-    \caption{Test and train results for experiments 1, 2, 3, 4 and 5}
-    \label{tab:placeholder}
-\end{table}
-
 
 \addcontentsline{toc}{section}{Appendix}
 

@@ -17,14 +17,15 @@ from datetime import datetime
 
 sns.set(style="whitegrid")
 
-RESULTS_DIR = "results"
+# RESULTS_DIR = "results"
+RESULTS_DIR = "results_temporal_8020_4_align3/seed_42"
 OUT_DIR = os.path.join(RESULTS_DIR, "eval_output")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # ------------- helper functions to find files/columns -------------
 def find_prediction_csv(results_dir=RESULTS_DIR):
     # prefer explicit filename if present
-    prefer = ["bert_predictions.csv", "predictions.csv", "results.csv"]
+    prefer = ["bert_predictions.csv", "predictions.csv", "results.csv", "bert_eval_predictions.csv"]
     for p in prefer:
         pth = os.path.join(results_dir, p)
         if os.path.exists(pth):
@@ -109,7 +110,7 @@ def parse_logits_array(series):
 # ------------------ load predictions ------------------
 csv_path = find_prediction_csv()
 print("Using prediction CSV:", csv_path)
-df = pd.read_csv("results/bert_test_predictions.csv",
+df = pd.read_csv(os.path.join(RESULTS_DIR,"bert_eval_predictions.csv"),
                  engine="python",
                  encoding="utf-8",
                  on_bad_lines="skip")
