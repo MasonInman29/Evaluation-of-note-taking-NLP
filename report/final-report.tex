@@ -94,16 +94,72 @@ We compare three modeling approaches that embody different assumptions about how
 The subsections below summarize the design principles of each approach.
 
 \subsection{Rule-Based Model Methodology}
-For the rule based model approach, we decided to combine 5 metrics to evaluate the rule based prediction. These metrics are fuzzing matching, using RapidFuzz's token\_sort\_ratio, jaccard similarity, semantic similarity, using spaCy's embeddings, cosine similarity and numerical matching. The implementation of the model is split into three separate sections: \texttt{pre\_processing.ipynb}, \texttt{main.ipynb} and \texttt{threshold\_testing.ipynb}.\\
 
-\paragraph{Preprocessing (\texttt{pre\_processing.ipynb}).}
-This file loads the selected CSV file, \texttt{train.csv} and \texttt{test.csv}, and applies a cleaning function on the 'Question', 'Response' and 'CorrectAnswer' columns. Here is a description of the features of the cleaning function: it handles missing values and Nans, preventing them from breaking the prediction, it converts every letter to lowercase and sends them into spaCy's nlp pipeline. Finally, it lemmatizes the words while filtering out punctuations and unnecessary spaces. Collectively, this allows our evaluation to be more accurate and precise. The results of pre-processing are saved into a separate CSV file.
+We implement a relatively simple rule-based approach using \textbf{Fuzzy Ratio}. It is a string similarity metric derived from \texttt{Levenshtein Distance (LD)}. For this approach, the model utilizes the provided reference answer as the standard for scoring.
 
-\paragraph{Threshold Testing (\texttt{threshold\_testing.ipynb}).}
-This file loads \texttt{train\_cleaned.csv} and for computational purposes, we only selected for testing the lower threshold for a label of 1 to be 0.60-0.65 and the lower threshold for a label of 0 to be 0.55 to whatever the current lower threshold for label of 1 is. The process of calculating the \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match} is carried out with a similar implementation as \texttt{main.ipynb}, which will be explained in detail in the following paragraph. The testing results are saved into a separate CSV file.
+The dataset that the project works with is lexically short, consisting of few words or even single phrases. As a result of fewer tokens, each token carries high semantic weight, making character-level similarity a good perspective for correctness. This model is well-suited for short and 'more objective than subjective' datasets. 
 
-\paragraph{Execution on Train dataset (\texttt{main.ipynb}).}
-This file uses the optimal thresholds provided by \texttt{threshold\_testing.ipynb} and applies them on \texttt{train\_cleaned.csv}. We calculate the \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match} and assign them weights to combine the metrics to give a weighted score. The predictions are saved in the 'Predicted Label' column of a separate CSV file.
+\paragraph{Normalized similarity}
+
+Our model is based on the idea of LD, which measures the minimum number of single-character edits required to transform a string $s_1$ into another $s_2$. These edits consist of insertion, deletion and substitution. 
+
+Although LD operates at the character level, our model's token-sorted fuzzy ratio first tokenizes and alphabetically sorts words before computing character-level edit distance. This preprocessing step reduces sensitivity to word order while still penalizing missing, extra, or misspelled tokens. As a result, the method is well-suited for short-answer grading tasks where lexical overlap is more important than syntactic structure. We still measure character edits but only after neutralizing the effect of word order.
+
+To ensure that the distance is comparable across strings of different lengths, we normalize LD into a similarity score:
+
+Let a response string be $R$ and the reference answer $C$. Tokenize each string into word sets and sort alphabetically:
+
+\[
+\text{tokens}(R) = [r_1, \dots, r_m] 
+\xrightarrow{\text{sort}}
+R_s = r_{(1)}, \dots, r_{(m)}
+\]
+
+\[
+\text{tokens}(C) = [c_1, \dots, c_n] 
+\xrightarrow{\text{sort}}
+C_s = c_{(1)}, \dots, c_{(n)}
+\]
+
+\[
+\text{FuzzyRatio}(R, C) = 1 - \frac{LD(R_s, C_s)}{\max(|R_s|, |C_s|)}
+\]
+
+where:
+
+\begin{itemize}
+    \item $|R_s|$ and $|C_s|$ are the number of characters in the sorted strings,
+    \item $LD(R_s, C_s)$ is the minimum number of single-character insertions, deletions, and substitutions required to transform $R_s$ into $C_s$,
+    \item The resulting $\text{FuzzyRatio}(R, C) \in [0,1]$.
+\end{itemize}
+
+The denominator ensures that fuzzy ratio is within $[0, 1]$.
+
+\paragraph{Classification}
+
+Based on the fuzzy ratio score, each question is labeled according to empirically chosen thresholds. Thresholds can be selected using validation data to achieve individual goals for the model, to maximize F1-score and balance precision and recall.
+
+Let $\tau_1$ and $\tau_2$ be empirically chosen similarity thresholds, where $0 \leq \tau_2 < \tau_1 \leq 1$. $C =$ Correct, $PC=$ Partially Correct, and $I=$ Incorrect. Given a response $R$, reference answer $C$, and the computed token-sorted fuzzy ratio $\text{FuzzyRatio}(R, C)$, we classify responses as follows:
+
+\[
+\text{f}(R, C) =
+\begin{cases} 
+1, & \text{if } \text{f}(R, C) \ge \tau_1\text{(C)} \\
+0, & \text{if } \tau_2 \le \text{f}(R, C) < \tau_1 \text{(PC)} \\
+-1, & \text{if } \text{f}(R, C) < \tau_2 \quad \text{(I)}
+\end{cases}
+\]
+
+\noindent
+Here, $\tau_1$ and $\tau_2$ can be tuned using validation data to maximize desired metrics such as precision, recall, and F1-score.
+
+\paragraph{Assumptions}
+
+With this model, we are required to make several assumptions. Firstly, due to the nature of the project, we expect the responses to be short, such that the tokens are more greatly weighed allowing this model to work well. Secondly, we expect correct responses not to stray too far from the reference answer as the model is based on lexical overlap, not semantic similarity. Lastly, we assume that reference answers are available, allowing the direct comparison method by the model to work. 
+
+\paragraph{Limitations}
+
+Due to a sole reliance on lexical overlap, the model misses out on the benefits that comes from semantic inference. The model is strict and rigid, where the correct idea must be expressed using lexically similar wording. As the model is built to perform well on short-stringed datasets, it cannot scale to longer stringed datasets. Additionally, it is restricted as it cannot be replicated on datsets that do not contain a reference answer as a scoring standard, making reference-free grading impossible.
 
 \subsection{BERT-Based Classifier with Temporal Alignment Methodology}
 We fine-tune \texttt{bert-base-uncased} \citep{devlin2019bert} as a binary sequence-pair classifier. For each example, we encode an instructor IdeaUnit $u$ and a note span $x$ as
@@ -198,15 +254,8 @@ Formally, let $TP$, $FP$, and $FN$ denote true positives, false positives, and f
 \subsection{Experimental Setup}
 
 \paragraph{Rule-Based Model Experiments}
-For the rule based model, we began with 5 metrics for scoring - \texttt{fuzzy\_ratio}, \texttt{jaccard\_similarity}, \texttt{semantic\_similarity}, \texttt{cosine\_similarity}, and \texttt{num\_match}. This approach worked fairly well as the scoring mainly focuses on observing for overlapping words/tokens between Response and CorrectAnswer. As these are short answer questions, the scoring tends to be polarized easily, allowing a decisive prediction to be made. 
 
-For the second experiment, we decided to test the effects of removing \texttt{num\_match} as we realized that not all questions were numerical and due to \texttt{num\_match}'s weight, it would not be impactful. This led to improved results, which we believe wBERas due to the increased weight on \texttt{fuzzy\_ratio}, which prioritized overlapping/similar words instead of meaning.
-
-We realized that spaCy's \texttt{semantic\_similarity} was based on a machine learning model, and this means that the previous rule based models were not true rule based models. As we want the final rule based model to be completely rule based, we conducted our third experiment, where scoring left out \texttt{semantic}. The results showed that our first 'true' rule based model was performing better than the hydrid model with \texttt{semantic} as accuracy, precision and recall improved. 
-
-Following the same intuition we had in experiment two, we conducted our fourth experiment without \texttt{semantic} and \texttt{num\_match}. With the removal of these two metrics, we expected the accuracy to increase as the weight of remaining lexical-overlap metrics (especially \texttt{fuzzy\_ratio}) would increase, effectively making the classifier more sensitive to surface-level similarity which aligns well with our dataset.
-
-Observing the results of the past experiments, we realized how as the weight of \texttt{fuzzy\_ratio} increased, the results improved. We were interested about the effect on using \texttt{fuzzy\_ratio} as the sole metric for scoring, which we carried out in our fifth and final experiment. The results of the experiment matched our hypothesis as it surpassed the past experiments in accuracy, recall and F1 score. The other metrics were adding noise as their rewarding methods are not aligned with the nature of our dataset as \texttt{jaccard} was too harsh on subtle differences and \texttt{cosine} was struggling with insufficient tokens due to the short text. We concluded that short-answer questions in our dataset reward surface-level character similarity more than semantic structure or contextual meaning. As \texttt{fuzzy\_ratio} does this well without being too harsh, it produces the best result when used alone for this dataset.
+To determine the optimal thresholds, we ran a series of iterations over 
 
 \paragraph{BERT-Based Classifier Experiments}
 
@@ -308,6 +357,10 @@ One-shot  & Test  & 0.65 & 0.51 & 0.58 & 0.54 \\
 \end{table}
 
 \addcontentsline{toc}{section}{Appendix}
+
+L. Yujian and L. Bo, "A Normalized Levenshtein Distance Metric," in IEEE Transactions on Pattern Analysis and Machine Intelligence, vol. 29, no. 6, pp. 1091-1095, June 2007, doi: 10.1109/TPAMI.2007.1078.
+
+
 
 \bibliography{custom}
 
